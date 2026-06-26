@@ -455,6 +455,12 @@
       </label>
     </div>
     <div id="showCommunePointDetails">
+      <div class="checkbox-row">
+        <label>
+            <input type="checkbox" id="showPointValueMairies" >
+            À l'emplacement de la mairie
+        </label>
+      </div>
       <div class="font-size-control">
           <label for="pointSizeSlider">Taille du point :</label>
           <input type="range" id="pointSizeSlider" min="1" max="6" value="3">
@@ -551,8 +557,51 @@
 
 </div>
 <script>
-
-grist.ready({requiredAccess: 'full'});
+grist.ready({
+  requiredAccess: 'full',
+  requiredColumns: [
+    { name: "Metrique", type: "Any", title: "Métrique" },
+    { name: "TitreLegende", type: "Any", title: "Titre de la légende" },
+    { name: "AfficherChoroplethe", type: "Bool", title: "Afficher Choroplèthe" },
+    
+    { name: "AfficherNomCommunes", type: "Bool", title: "Afficher Nom Communes" },
+    { name: "AfficherNomMairies", type: "Bool", title: "Afficher Nom Mairies" },
+    { name: "AfficherNomEPCI", type: "Bool", title: "Afficher Nom EPCI" },
+    
+    { name: "AfficherPointsCommunes", type: "Bool", title: "Afficher Points Communes" },
+    { name: "DimensionPointsCommunes", type: "Any", title: "Dimension Points Communes" },
+    { name: "AfficherPointsMairies", type: "Bool", title: "Afficher Points Mairies" },
+    { name: "AfficherPointsEPCI", type: "Bool", title: "Afficher Points EPCI" },
+    { name: "DimensionPointsEPCI", type: "Any", title: "Dimension Points EPCI" },
+    
+    { name: "Type", type: "Any", title: "Type" },
+    { name: "Seuil1", type: "Numeric", title: "Seuil 1" },
+    { name: "Seuil2", type: "Numeric", title: "Seuil 2" },
+    { name: "Couleurs", type: "Any", title: "Couleurs" },
+    
+    { name: "TailleTexteCommunes", type: "Numeric", title: "Taille Texte Communes" },
+    { name: "CouleurTexteCommunes", type: "Any", title: "Couleur Texte Communes" },
+    { name: "TaillePointCommunes", type: "Numeric", title: "Taille Point Communes" },
+    { name: "CouleurPointCommunes", type: "Any", title: "Couleur Point Communes" },
+    { name: "AfficherPointCommuneALaMairie", type: "Bool", title: "Afficher Point Commune à la Mairie" },
+    { name: "PopPourPtCommunes", type: "Any", title: "Pop Pour Pt Communes" },
+    
+    { name: "TaillePointMairies", type: "Numeric", title: "Taille Point Mairies" },
+    { name: "CouleurPointMairies", type: "Any", title: "Couleur Point Mairies" },
+    
+    { name: "TailleTexteEPCI", type: "Numeric", title: "Taille Texte EPCI" },
+    { name: "CouleurTexteEPCI", type: "Any", title: "Couleur Texte EPCI" },
+    { name: "TaillePointEPCI", type: "Numeric", title: "Taille Point EPCI" },
+    { name: "CouleurPointEPCI", type: "Any", title: "Couleur Point EPCI" },
+    { name: "PopPourPtEPCI", type: "Any", title: "Pop Pour Pt EPCI" },
+    
+    { name: "CouleurLigne", type: "Any", title: "Couleur Ligne" },
+    { name: "MontrerLeFond", type: "Bool", title: "Montrer le Fond" },
+    { name: "CarteDGOM", type: "Bool", title: "Carte DGOM" },
+    { name: "Entite", type: "Any", title: "Entité" },
+    { name: "AfficherGeographie", type: "Bool", title: "Afficher Géographie" }
+  ]
+});
 
 let token;
 let baseUrl;
@@ -567,6 +616,7 @@ let titreLegende;
 let showChoroplethe;
 let showText;
 let showTextMairies;
+let showPointsAtMairies;
 let showTextEPCI;
 let showPoints ;
 let textPointsUnit ;
@@ -599,6 +649,8 @@ const showChoropletheValue = document.getElementById("showChoropletheValue");
 
 const showTextValue = document.getElementById("showTextValue");
 const showTextValueMairies = document.getElementById("showTextValueMairies");
+const showPointValueMairies = document.getElementById("showPointValueMairies");
+
 const showTextValueEPCI = document.getElementById("showTextValueEPCI");
 
 const showPointsValue = document.getElementById("showPointsValue");
@@ -754,6 +806,7 @@ async function initMetrique(metriqueId) {
       textColor: ref.CouleurTexteCommunes[i],
       pointSize: ref.TaillePointCommunes[i],
       pointColor: ref.CouleurPointCommunes[i],
+      afficherPointsAtMairies: ref.AfficherPointCommuneALaMairie[i],
       popPourPtCommunes: ref.PopPourPtCommunes[i],
       
       pointSizeMairies: ref.TaillePointMairies[i],
@@ -783,6 +836,7 @@ async function initMetrique(metriqueId) {
 
       showPoints = row.afficherPointsCommunes ;
       textPointsUnit = row.dimensionPointsCommunes ;
+      showPointsAtMairies = row.afficherPointsAtMairies;
       popPourPtCommunes = row.popPourPtCommunes ;
 
       showPointsMairies = row.afficherPointsMairies ;  
@@ -821,6 +875,7 @@ async function initMetrique(metriqueId) {
       showChoropletheValue.checked = showChoroplethe;
       showTextValue.checked = showText;
       showTextValueMairies.checked = showTextMairies;
+      showPointValueMairies.checked = showPointsAtMairies;
       showTextValueEPCI.checked = showTextEPCI;
 
       showPointsValue.checked = showPoints;
@@ -933,6 +988,10 @@ async function init() {
     });
      showTextValueMairies.addEventListener("change", (e) => { 
       showTextMairies = e.target.checked ;
+      refreshMap(true);
+    });
+     showPointValueMairies.addEventListener("change", (e) => { 
+      showPointsAtMairies = e.target.checked ;
       refreshMap(true);
     });
     showTextValueEPCI.addEventListener("change", (e) => { 
@@ -1127,11 +1186,11 @@ console.log(geojson.type);
       Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
       console.log("pas population")
     }
-    
+
     traces.push({
       type: 'scattermapbox',
-      lon: DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)),
-      lat: DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)),
+      lon: showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
+      lat: showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1202,13 +1261,7 @@ console.log(geojson.type);
   }
 
   // --- COUCHE TEXTE COMMUNES (MAPBOX) ---
-  if (showText) {
-    console.log("showtext")
-    console.log("showTextMairies" + showTextMairies)
-    console.log("DGOMMap" + DGOMMap)
-    console.log(records)
-    const cou = showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)))
-    console.log(cou)
+  if (showText) {    
     traces.push({
       type: 'scattermapbox', // Changement ici
       lon: showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long))),
@@ -1507,6 +1560,7 @@ async function saveMetricOptions() {
         AfficherNomCommunes: showText,
         AfficherNomEPCI: showTextEPCI,
         AfficherPointsCommunes: showPoints,   
+        AfficherPointCommuneALaMairie: showPointsAtMairies,
         AfficherPointsMairies: showPointsMairies,   
         AfficherPointsEPCI: showPointsEPCI,
         TailleTexteCommunes: textSize,
