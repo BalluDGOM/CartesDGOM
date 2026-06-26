@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://unpkg.com/jsts@2.12.1/dist/jsts.min.js"></script>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Marianne", Arial, sans-serif;
+      color: #08306B;
+    }
+    #main {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+    }
+    
+    #graph {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    #chart {
+        flex: 1;
+        min-height: 0;
+    }
+
+    #legend {
+      width: 180px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+
+    /* Le conteneur principal à gauche */
+    #sidebar {
+      position: fixed;
+      top: 10px; /* Aligné sur le haut du layout */
+      left: 20px;
+      z-index: 10000;
+      
+      /* On force la barre à faire exactement la même hauteur que le bloc #main */
+      /* Si #main prend tout l'écran, tu peux mettre height: calc(100vh - 30px); */
+      height: 95vh; /* Ajuste ce pourcentage (ou une valeur en px) selon la hauteur réelle de ton #main */
+      
+      /* Flexbox vertical */
+      display: flex;
+      flex-direction: column;
+      align-items: left;
+      
+      /* RÉPARTITION : Pousse la caméra en haut, les options en bas, le texte au milieu */
+      justify-content: space-between; 
+      
+      width: 100px;
+    }
+
+    /* Style des boutons (inchangé) */
+    #cameraBtn, #togglePanel {
+      width: 48px;
+      height: 48px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      flex-shrink: 0; /* Empêche les boutons de se déformer si la hauteur est petite */
+    }
+
+    /* Le cadre textuel au milieu */
+    #nomTerritoire {
+      width: 120px;
+      /* Design */
+      background-color: #A1DFDD ; //#8AD7D5 ;
+      border: 1px solid #08306B;
+      border-radius: 12px;
+      
+      /* Alignement du texte */
+      padding: 8px 8px;
+      font-size: 20px;
+      text-align: center;
+      
+      /* Gestion du texte vertical */
+      word-wrap: break-word;
+      white-space: normal;
+    }
+   
+    /* PANEL LATÉRAL */
+    #sidePanel {
+      position: fixed;
+      top: 0;
+      right: 0;
+
+      width: 280px;
+      height: 100vh;
+
+      background: white;
+      box-shadow: -3px 0 15px rgba(0,0,0,0.2);
+
+      transform: translateX(0);
+      transition: transform 0.25s ease;
+
+      z-index: 9999;
+
+      display: flex;
+      flex-direction: column;
+
+      overflow: hidden;
+    }
+
+    /* panneau caché */
+    #sidePanel.hidden {
+      transform: translateX(100%);
+    }
+
+    /* HEADER */
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    /* CONTENU */
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+
+      padding: 10px;
+
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .panel-content label, .switch-container label {
+      font-size: 10px;
+      font-weight: 400;
+    }
+    .panel-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .panel-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .panel-content::-webkit-scrollbar-thumb {
+      background: #bbb;
+      border-radius: 4px;
+    }
+
+    .panel-content::-webkit-scrollbar-thumb:hover {
+      background: #999;
+    }
+
+    /* bouton fermer */
+    #closePanel {
+      border: none;
+      background: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    #legend {
+      width: 150px;
+      padding: 10px;
+     // border-left: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      //align-items: center;
+      justify-content: center; /* vertical */
+    }
+    /* Titre */
+    .legend-titre {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    /* Conteneur de la légende */
+    .legend-list {
+        max-height: 300px;          /* hauteur maximale souhaitée */
+        overflow-y: auto;           /* barre de défilement verticale si dépassement */
+        padding-right: 4px;         /* espace pour la barre de défilement */
+    }
+
+    /* Items de légende */
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;            /* espacement plus compact */
+        width: fit-content;
+    }
+
+    .legend-text {
+        font-size: 10px;
+        font-weight: 400;
+    }
+    /* Texte des options */
+    .options-text {
+        font-size: 8px;
+        font-weight: 400;
+    }
+
+    /* Couleurs et points */
+    .legend-color,
+    .legend-point {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+    }
+    .legend-color {
+        border: 1px solid #666;
+    }
+    .legend-point {
+        border-radius: 50%;
+    }
+   /* .legend-text {
+      font-size: 10px;
+      font-weight: 400;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #666;
+      flex-shrink: 0;
+    }
+    .legend-point {
+      width: 16px;
+      height: 16px; 
+      border-radius: 50%;
+      flex-shrink: 0;
+    }*/
+    .js-plotly-plot .modebar {
+      top: 40px !important;   /* décale vers le bas */
+      right: 50px !important;
+    }
+    .color-row {
+      display: grid;
+      grid-template-columns: 130px 44px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .color-row > :first-child {
+      width: auto;
+    }
+    .color-row, .checkbox-row {
+    display: grid;
+    grid-template-columns: 1fr auto;   /* texte à gauche, contrôle à droite */
+    align-items: center;                /* alignement vertical */
+    gap: 8px;                           /* espace horizontal */
+    margin-bottom: 8px;
+    }
+    /* Alignement du contrôle (color picker ou switch) */
+    .color-row input[type="color"], .color-row .switch, .checkbox-row .switch {
+    justify-self: end;                 /* pousse le contrôle à droite */
+    margin-right: 30px;
+    }
+   
+    
+    #textColorPicker, #textColorPickerEPCI, #lineColorPicker, #pointColorPicker, #pointColorPickerEPCI, #pointColorPickerMairies {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 2px solid #ccc;
+    }
+    #pointColorPicker, #pointColorPickerEPCI, #pointColorPickerMairies {
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .separator {
+      border: 0;
+      border-top: 1px solid #d9d9d9; /* gris clair */
+      margin: 8px 0;
+    }
+    .slider-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    #fontSizeSlider, #fontSizeSliderEPCI {
+        flex: 1;
+    }
+
+    #fontSizeValue, #fontSizeValueEPCI {
+        min-width: 25px;
+    }
+
+    .switch-container {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-top: 8px;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        margin-left: 0px;
+    }
+  
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        inset: 0;
+        cursor: pointer;
+        background-color: #ccc;
+        border-radius: 24px;
+        transition: .2s;
+    }
+
+    .slider:before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: .2s;
+    }
+
+    input:checked + .slider {
+        background-color: #2196F3;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+    .font-size-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .font-size-control label {
+        white-space: nowrap;
+    }
+
+    .font-size-control input[type="range"] {
+        flex: 1;
+    }
+
+    .titre {
+      font-size: 18px;
+      text-align: center;
+      margin: 0;
+      padding-top: 6px;
+      flex: 0 0 auto;
+    }
+
+    .notOwner { 
+      font-size: 10px;
+      text-align: center;
+      font-style: italic;
+    }
+
+    #showChoropletheDetails, #showCommuneTextDetails, #showMairiePointDetails,  #showEPCITextDetails , #showCommunePointDetails, #showEPCIPointDetails  {
+        margin-left: 0.8rem;
+    }
+    .hidden { display:none; }
+  </style>
+</head>
+
+<body>
+<div id="main">
+  
+  <div id="info"></div>
+  <div class="titre" id="titre"></div>
+  <div id="graph">
+    <div id="chart"></div>
+    <div id="legend"></div>
+  </div>
+</div>
+<div id="sidebar">
+  <button id="cameraBtn" title="Exporter la carte">📷</button>
+  
+  <div id="nomTerritoire">Nom du territoire</div>
+  
+  <button id="togglePanel" title="Options">⚙️</button>
+</div>
+<div id="sidePanel" class="hidden">
+
+  <div class="panel-header">
+    <b>Options</b>
+    <button id="closePanel">✕</button>
+  </div>
+
+  <div class="panel-content">
+    <select id="territoireSelect"></select>
+    <div class="checkbox-row">
+      <label>
+          <input type="checkbox" id="showChoropletheValue" >
+          Afficher la choroplèthe
+      </label>
+    </div>
+    <div id="showChoropletheDetails">
+      <div class="color-row">
+        <label for="lineColorPicker">Couleur des lignes :</label>
+        <input type="color" id="lineColorPicker" value="#000000">
+      </div>
+    </div>
+    <hr class="separator">
+    <b>Communes</b>
+    <div class="checkbox-row">
+      <label>
+          <input type="checkbox" id="showTextValue">
+          Afficher le nom des communes
+      </label>
+    </div>
+    <div id="showCommuneTextDetails">
+      <div class="checkbox-row">
+        <label>
+            <input type="checkbox" id="showTextValueMairies" >
+            À l'emplacement de la mairie
+        </label>
+      </div>
+      <div class="font-size-control">
+          <label for="fontSizeSlider">Taille du texte :</label>
+          <input type="range" id="fontSizeSlider" min="6" max="30" value="12">
+          <span id="fontSizeValue" class="options-text">12</span>
+      </div>
+      <div class="color-row">
+          <label for="textColorPicker">Couleur du texte :</label>
+          <input type="color" id="textColorPicker" value="#000000">
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <label>
+          <input type="checkbox" id="showPointsValue">
+          Afficher les points des communes <br/>(centre de la commune, taille en fonction de "ValeurPointCommune")
+      </label>
+    </div>
+    <div id="showCommunePointDetails">
+      <div class="font-size-control">
+          <label for="pointSizeSlider">Taille du point :</label>
+          <input type="range" id="pointSizeSlider" min="1" max="6" value="3">
+          <span id="pointSizeValue" class="options-text">12</span>
+      </div>
+      <div class="color-row">
+          <label for="pointColorPicker">Couleur des points :</label>
+          <input type="color" id="pointColorPicker" value="#000000">
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <label>
+          <input type="checkbox" id="showPointsValueMairies" >
+          Afficher les points des mairies <br/>(emplacement de la mairie, valeur fixe)
+      </label>
+    </div>
+    <div id="showMairiePointDetails">
+      <div class="font-size-control">
+          <label for="pointSizeSliderMairies">Taille du point :</label>
+          <input type="range" id="pointSizeSliderMairies" min="1" max="6" value="3">
+          <span id="pointSizeValueMairies" class="options-text">12</span>
+      </div>
+      <div class="color-row">
+          <label for="pointColorPickerMairies">Couleur des points :</label>
+          <input type="color" id="pointColorPickerMairies" value="#000000">
+      </div>
+    </div>
+    <hr class="separator">
+    <b>Regroupements</b> 
+     <div class="checkbox-row">
+      <label>
+          <input type="checkbox" id="showTextValueEPCI" >
+          Afficher le nom des EPCI
+      </label>
+    </div>
+    <div id="showEPCITextDetails" >
+      <div class="font-size-control">
+          <label for="fontSizeSliderEPCI">Taille du texte :</label>
+          <input type="range" id="fontSizeSliderEPCI" min="6" max="30" value="12">
+          <span id="fontSizeValueEPCI" class="options-text">12</span>
+      </div>
+      <div class="color-row">
+          <label for="textColorPickerEPCI">Couleur du texte :</label>
+          <input type="color" id="textColorPickerEPCI" value="#000000">
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <label for="showPointsValueEPCI">
+          <input type="checkbox" id="showPointsValueEPCI" >
+          Afficher les points des EPCI  <br/>(centre de l'EPCI, taille en fonction de "ValeurPointEPCI")
+      </label>
+    </div>
+    <div id="showEPCIPointDetails">
+      <div class="font-size-control">
+          <label for="pointSizeSliderEPCI">Taille du point :</label>
+          <input type="range" id="pointSizeSliderEPCI" min="1" max="6" value="3">
+          <span id="pointSizeValueEPCI" class="options-text">12</span>
+      </div>
+      <div class="color-row">
+          <label for="pointColorPickerEPCI">Couleur des points :</label>
+          <input type="color" id="pointColorPickerEPCI" value="#000000">
+      </div>
+    </div>
+    <hr class="separator">
+    
+    <div class="color-row" >
+      <span class="options-text">Afficher le fond</span>
+      <label class="switch">
+          <input type="checkbox" id="showMap">
+          <span class="slider"></span>
+      </label>
+    </div>   
+    <div class="color-row" >
+      <span class="options-text">Utiliser la carte DGOM</span>
+      <label class="switch">
+          <input type="checkbox" id="DGOMMap">
+          <span class="slider"></span>
+      </label>
+    </div>  
+     <div class="checkbox-row">
+      <span class="options-text">Montrer la géographie <br/>(nom des îles)</span>
+      <label class="switch">
+          <input type="checkbox" id="showGeoValue">
+          <span class="slider"></span>
+      </label>
+    </div> 
+    <hr class="separator">
+    <button id="saveMetricBtn">
+      Enregistrer dans la métrique
+    </button>
+    <span id="notOwner" class="notOwner" >Vous n'avez pas la permission d'enregistrer d'options sur cette métrique</span>
+
+  </div>
+
+</div>
+<script>
+
+grist.ready({requiredAccess: 'full'});
+
+let token;
+let baseUrl;
+let territoire;
+let dataRecords = [];
+let territoireRows = [];
+let select = document.getElementById("territoireSelect");
+let pendingSelectedValue = null;
+let currentMetriqueId;
+let metriqueNom;
+let titreLegende;
+let showChoroplethe;
+let showText;
+let showTextMairies;
+let showTextEPCI;
+let showPoints ;
+let textPointsUnit ;
+let showPointsMairie ;
+let showPointsEPCI ;
+let showGeo ;
+let textPointsUnitEPCI ;
+let metriqueType;
+let metriqueSeuil1;
+let metriqueSeuil2;
+let metriqueCouleurs;
+let textSize = 12;
+let textSizeEPCI = 12;
+let textColor = "#000000";
+let textColorEPCI = "#000000";
+let lineColor;
+let pointColor = "#000000";
+let pointColorEPCI = "#000000";
+let toolbarVisible = true;
+let showMap = false;
+let DGOMMap = false;
+let sidePanel = false;
+let entiteId = 0;
+let role = "";
+let dernierTerritoireAffiche = null;
+
+
+
+const showChoropletheValue = document.getElementById("showChoropletheValue");
+
+const showTextValue = document.getElementById("showTextValue");
+const showTextValueMairies = document.getElementById("showTextValueMairies");
+const showTextValueEPCI = document.getElementById("showTextValueEPCI");
+
+const showPointsValue = document.getElementById("showPointsValue");
+const showPointsValueMairie = document.getElementById("showPointsValueMairie");
+const showPointsValueEPCI = document.getElementById("showPointsValueEPCI");
+
+const showGeoValue = document.getElementById("showGeoValue");
+
+const fontSizeSlider = document.getElementById("fontSizeSlider");
+const fontSizeValue = document.getElementById("fontSizeValue");
+const textColorPicker = document.getElementById("textColorPicker");
+
+const fontSizeSliderMairie = document.getElementById("fontSizeSliderMairie");
+const fontSizeValueMairie = document.getElementById("fontSizeValueMairie");
+const textColorPickerMairie = document.getElementById("textColorPickerMairie");
+
+const fontSizeSliderEPCI = document.getElementById("fontSizeSliderEPCI");
+const fontSizeValueEPCI = document.getElementById("fontSizeValueEPCI");
+const textColorPickerEPCI = document.getElementById("textColorPickerEPCI");
+
+const lineColorPicker = document.getElementById("lineColorPicker");
+
+const pointColorPicker = document.getElementById("pointColorPicker");
+const pointColorPickerMairie = document.getElementById("pointColorPickerMairie");
+const pointColorPickerEPCI = document.getElementById("pointColorPickerEPCI");
+
+const pointSizeSlider = document.getElementById("pointSizeSlider");
+const pointSizeValue = document.getElementById("pointSizeValue");
+const pointSizeSliderMairie = document.getElementById("pointSizeSliderMairie");
+const pointSizeValueMairie = document.getElementById("pointSizeValueMairie");
+const pointSizeSliderEPCI = document.getElementById("pointSizeSliderEPCI");
+const pointSizeValueEPCI = document.getElementById("pointSizeValueEPCI");
+
+const showMapSwitch = document.getElementById("showMap");
+const DGOMMapSwitch = document.getElementById("DGOMMap");
+const panel = document.getElementById("sidePanel");
+const openBtn = document.getElementById("togglePanel");
+const closeBtn = document.getElementById("closePanel");
+
+
+syncShowMap();
+// Mise à jour à chaque changement de l’état de DGOMMap
+DGOMMapSwitch.addEventListener('change', syncShowMap);
+openBtn.addEventListener("click", () => {
+  const hidden = panel.classList.toggle("hidden");
+  openBtn.text = hidden ? "Ouvrir les options" : "Fermer les options";
+});
+
+closeBtn.addEventListener("click", () => {
+  panel.classList.add("hidden");
+});
+window.addEventListener("resize", () => {
+  Plotly.Plots.resize(document.getElementById("chart"));
+});
+
+document.getElementById("cameraBtn").addEventListener("click", async () => {
+  const chartDiv = document.getElementById("chart");
+  const target = document.getElementById("main");
+
+  try {
+    // 1. On demande à Plotly de générer l'image PNG de la carte seule
+    const plotlyImageData = await Plotly.toImage(chartDiv, {
+      format: 'png',
+      width: chartDiv.offsetWidth * 2,  // Équivalent scale: 2
+      height: chartDiv.offsetHeight * 2,
+      imageDataOnly: false
+    });
+
+    // 2. On crée une image temporaire pour remplacer le canvas WebGL
+    const tempImg = document.createElement('img');
+    tempImg.src = plotlyImageData;
+    tempImg.style.width = '100%';
+    tempImg.style.height = '100%';
+
+    // 3. On cache temporairement le graphique Plotly et on met l'image à la place
+    const originalContent = chartDiv.innerHTML;
+    chartDiv.innerHTML = '';
+    chartDiv.appendChild(tempImg);
+
+    // 4. On laisse un tout petit délai pour que le DOM se mette à jour, puis on lance html2canvas
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const canvas = await html2canvas(target, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      allowTaint: true
+    });
+
+    // 5. On restaure le graphique Plotly interactif d'origine
+    chartDiv.innerHTML = originalContent;
+    // Note: Selon ta version de Plotly, il peut être nécessaire de relancer Plotly.react() 
+    // ou Plotly.Plots.resize() ici si la carte ne répond plus au survol.
+
+    // 6. Téléchargement
+    const image = canvas.toDataURL("image/png");
+    const imageName = "Carte-" + metriqueNom + "-" + territoire + ".png";
+    downloadImage(image, imageName);
+
+  } catch (error) {
+    console.error("Erreur lors de l'export :", error);
+  }
+});
+
+async function loadGeoJson(geoJsonCell) {
+  const attachments =
+  await grist.docApi.fetchTable("_grist_Attachments");
+  try {
+    const attachmentId = geoJsonCell[1];
+        const url = `${baseUrl}/attachments/${attachmentId}/download?auth=${token}`;
+        const response = await fetch(url);
+
+        const geojson = await response.json();
+
+        return geojson;
+        
+      } catch (error) {
+        console.error("Error downloading or encoding image:", error);
+      }
+}
+
+async function initMetrique(metriqueId) {
+  
+  const ref =  await grist.docApi.fetchTable("Metriques");
+  currentMetriqueId = metriqueId;
+
+  console.log("metreique")
+  console.log(ref)
+
+  metriqueRows =
+    ref.id.map((_, i) => ({
+      id: ref.id[i],
+      nom: ref.Metrique[i],
+      titreLegende: ref.TitreLegende[i],
+      afficherChoroplethe: ref.AfficherChoroplethe[i],
+
+      afficherNomCommunes: ref.AfficherNomCommunes[i],
+      afficherNomMairies: ref.AfficherNomMairies[i],
+      afficherNomEPCI: ref.AfficherNomEPCI[i],
+
+      afficherPointsCommunes: ref.AfficherPointsCommunes[i],
+      dimensionPointsCommunes: ref.DimensionPointsCommunes[i],
+      afficherPointsMairies: ref.AfficherPointsMairies[i],
+      afficherPointsEPCI: ref.AfficherPointsEPCI[i],
+      dimensionPointsEPCI: ref.DimensionPointsEPCI[i],
+
+      type: ref.Type[i],
+      seuil1: ref.Seuil1[i],
+      seuil2: ref.Seuil2[i],
+      couleurs: ref.Couleurs[i],
+
+      textSize: ref.TailleTexteCommunes[i],
+      textColor: ref.CouleurTexteCommunes[i],
+      pointSize: ref.TaillePointCommunes[i],
+      pointColor: ref.CouleurPointCommunes[i],
+      
+      pointSizeMairies: ref.TaillePointMairies[i],
+      pointColorMairies: ref.CouleurPointMairies[i],
+
+      textSizeEPCI: ref.TailleTexteEPCI[i],
+      textColorEPCI: ref.CouleurTexteEPCI[i],
+      pointSizeEPCI: ref.TaillePointEPCI[i],
+      pointColorEPCI: ref.CouleurPointEPCI[i],
+
+      lineColor: ref.CouleurLigne[i],
+      showMap: ref.MontrerLeFond[i],
+      DGOMMap: ref.CarteDGOM[i],
+      entite: ref.Entite[i],
+      showGeo: ref.AfficherGeographie[i]
+    }));
+  metriqueRows.forEach(row => {
+    if (row.id == metriqueId) {
+      metriqueNom = row.nom ;
+      titreLegende = row.titreLegende
+      showChoroplethe = row.afficherChoroplethe ;
+
+      showText = row.afficherNomCommunes ;
+      showTextMairies = row.afficherNomMairies ;
+      showTextEPCI = row.afficherNomEPCI ;
+
+      showPoints = row.afficherPointsCommunes ;
+      textPointsUnit = row.dimensionPointsCommunes ;
+
+      showPointsMairies = row.afficherPointsMairies ;  
+
+      showPointsEPCI = row.afficherPointsEPCI ;
+      textPointsUnitEPCI = row.dimensionPointsEPCI ; 
+      showGeo = row.showGeo ;
+      metriqueType = row.type ;
+      metriqueSeuil1 = row.seuil1 ;
+      metriqueSeuil2 = row.seuil2 ;
+      metriqueCouleurs = row.couleurs ;
+
+      textSize = row.fontSize ?? 12;
+      textColor = row.textColor ?? "#000000";
+      pointSize = row.pointSize ?? 1;
+      pointColor = row.pointColor ?? "#000000";
+
+      textSizeMairies = row.fontSizeValueMairie ?? 12;
+      textColorMairies = row.textColorMairies ?? "#000000";
+      pointSizeMairies = row.pointSizeMairies ?? 1;
+      pointColorMairies = row.pointColorMairies ?? "#000000";
+
+      textSizeEPCI = row.fontSizeEPCI ?? 12;
+      textColorEPCI = row.textColorEPCI ?? "#000000";
+      pointSizeEPCI = row.pointSizeEPCI ?? 1;
+      pointColorEPCI = row.pointColorEPCI ?? "#000000";
+
+      lineColor = row.lineColor ?? "#000000";
+      showMap = row.showMap ?? false;
+      DGOMMap = row.DGOMMap ?? false;
+      entiteMetrique = row.entite;
+      //initialisation des valeurs du sidePanel
+      
+      showChoropletheValue.checked = showChoroplethe;
+      showTextValue.checked = showText;
+      showTextValueMairies.checked = showTextMairies;
+      showTextValueEPCI.checked = showTextEPCI;
+
+      showPointsValue.checked = showPoints;
+      showPointsValueMairies.checked = showPointsMairies;
+      showPointsValueEPCI.checked = showPointsEPCI;
+      
+      fontSizeSlider.value = textSize;
+      fontSizeValue.textContent = textSize;
+
+      fontSizeSliderEPCI.value = textSizeEPCI;
+      fontSizeValueEPCI.textContent = textSizeEPCI;
+      
+      textColorPicker.value = textColor;
+      textColorPickerEPCI.value = textColorEPCI;
+
+      pointColorPicker.value = pointColor;
+      pointSizeSlider.value = pointSize;
+      pointSizeValue.textContent = pointSize;
+
+      pointColorPickerMairies.value = pointColorMairies;
+      pointSizeSliderMairies.value = pointSizeMairies;
+      pointSizeValueMairies.textContent = pointSizeMairies;
+
+      pointColorPickerEPCI.value = pointColorEPCI;
+      pointSizeSliderEPCI.value = pointSizeEPCI;
+      pointSizeValueEPCI.textContent = pointSizeEPCI;
+     
+
+      lineColorPicker.value = lineColor;
+      showGeoValue.checked = showGeo;
+      showMapSwitch.checked = showMap;
+      DGOMMapSwitch.checked = DGOMMap;
+      document.getElementById("titre").innerHTML = metriqueNom;
+      const saveMetricBtn = document.getElementById("saveMetricBtn");
+
+      if (entiteId === entiteMetrique || role === "Admin") {
+          saveMetricBtn.style.display = "block"; // ou "" selon ton CSS
+          document.getElementById("notOwner").style.display = "none";          
+      } else {
+          saveMetricBtn.style.display = "none";
+          document.getElementById("notOwner").style.display = "block";
+      }
+      document.getElementById("showChoropletheDetails").classList.toggle('hidden', !showChoroplethe);   // true → ajoute la classe, false → la retire
+      document.getElementById("showCommuneTextDetails").classList.toggle('hidden', !showText);   // true → ajoute la classe, false → la retire
+      document.getElementById("showEPCITextDetails").classList.toggle('hidden', !showTextEPCI);   // true → ajoute la classe, false → la retire
+      document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);   // true → ajoute la classe, false → la retire
+      document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);   // true → ajoute la classe, false → la retire
+      document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
+    }
+    console.log(metriqueRows)
+  });
+ 
+    
+  
+}
+
+async function init() {
+  await getUtilisateur();    
+  // Get token ONCE
+  ({ token, baseUrl } =
+    await grist.docApi.getAccessToken({
+      readOnly: true
+    }));
+  const ref = await grist.docApi.fetchTable("RefTerritoires");
+ 
+  territoireRows =
+    ref.id.map((_, i) => ({
+      territoire: ref.Nom[i],
+      geoJson: ref.GeoJson[i],
+      geoJsonDGOM: ref.GeoJsonDGOM[i],
+      limiteN: ref.LimiteN[i],
+      limiteS: ref.LimiteS[i],
+      limiteE: ref.LimiteE[i],
+      limiteO: ref.LimiteO[i],
+      latCentreCarte: ref.LatCentreCarte[i],
+      longCentreCarte: ref.LongCentreCarte[i],
+      zoomCarte: ref.ZoomCarte[i],
+      latCentreCarteDGOM: ref.LatCentreCarteDGOM[i],
+      longCentreCarteDGOM: ref.LongCentreCarteDGOM[i],
+      zoomCarteDGOM: ref.ZoomCarteDGOM[i],
+    })); 
+  console.log("territoireRows") 
+  console.log(territoireRows)
+  territoireRows.forEach(row => {
+    const option =  document.createElement("option");
+    if (row.geoJson) {
+      option.value = row.territoire;
+      option.textContent = row.territoire;
+      select.appendChild(option);
+    }
+  });
+  applySavedValue();
+  select.addEventListener('change', (event) => {
+      const selectedValue = event.target.value;
+      console.log("change select")
+      refreshMap(true)
+      // Enregistre la valeur sous la clé 'selectedView'
+      grist.setOption('selectedView', selectedValue);
+    });
+    showChoropletheValue.addEventListener("change", (e) => { 
+      showChoroplethe = e.target.checked ;
+      document.getElementById("showChoropletheDetails").classList.toggle('hidden', !showChoroplethe);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+
+    showTextValue.addEventListener("change", (e) => { 
+      showText = e.target.checked ;
+      document.getElementById("showCommuneTextDetails").classList.toggle('hidden', !showText);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+     showTextValueMairies.addEventListener("change", (e) => { 
+      showTextMairies = e.target.checked ;
+      refreshMap(true);
+    });
+    showTextValueEPCI.addEventListener("change", (e) => { 
+      showTextEPCI = e.target.checked ;
+      document.getElementById("showEPCITextDetails").classList.toggle('hidden', !showTextEPCI);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+    showPointsValue.addEventListener("change", (e) => { 
+      showPoints = e.target.checked ;
+      document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+    showPointsValueMairies.addEventListener("change", (e) => { 
+      showPointsMairies = e.target.checked ;
+      document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+    showPointsValueEPCI.addEventListener("change", (e) => { 
+      showPointsEPCI = e.target.checked ;
+      document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
+      refreshMap(true);
+    });
+    showGeoValue.addEventListener("change", (e) => { 
+      showGeo = e.target.checked ;
+      refreshMap(true);
+    });
+  fontSizeSlider.addEventListener("input", (e) => {
+      textSize = Number(e.target.value);
+      fontSizeValue.textContent = textSize;
+      refreshMap(true);
+    });
+  textColorPicker.addEventListener("input", (e) => {
+      textColor = e.target.value;
+      refreshMap(true);
+    });
+  fontSizeSliderEPCI.addEventListener("input", (e) => {
+      textSizeEPCI = Number(e.target.value);
+      fontSizeValueEPCI.textContent = textSizeEPCI;
+      refreshMap(true);
+    });
+  textColorPickerEPCI.addEventListener("input", (e) => {
+      textColorEPCI = e.target.value;
+      refreshMap(true);
+    });
+  lineColorPicker.addEventListener("input", (e) => {
+      lineColor = e.target.value;
+      refreshMap(true);
+    });
+  pointColorPicker.addEventListener("input", (e) => {
+      pointColor = e.target.value;
+      refreshMap(true);
+    });
+  pointColorPickerMairies.addEventListener("input", (e) => {
+      pointColorMairies = e.target.value;
+      refreshMap(true);
+    });
+  pointColorPickerEPCI.addEventListener("input", (e) => {
+      pointColorEPCI = e.target.value;
+      refreshMap(true);
+    });
+  showMapSwitch.addEventListener("input", (e) => {
+      showMap = e.target.checked;
+      refreshMap(true);
+    });
+  DGOMMapSwitch.addEventListener("input", (e) => {
+      DGOMMap = e.target.checked;
+      refreshMap(true);
+    });
+  pointSizeSlider.addEventListener("input", (e) => {
+      pointSize = Number(e.target.value);
+      pointSizeValue.textContent = pointSize;
+      refreshMap(true);
+    });
+  pointSizeSliderMairies.addEventListener("input", (e) => {
+      pointSizeMairies = Number(e.target.value);
+      pointSizeValueMairies.textContent = pointSizeMairies;
+      refreshMap(true);
+    });
+  pointSizeSliderEPCI.addEventListener("input", (e) => {
+      pointSizeEPCI = Number(e.target.value);
+      pointSizeValueEPCI.textContent = pointSizeEPCI;
+      refreshMap(true);
+    });
+}
+
+async function refreshMap(sidePanel) {
+
+  territoire = document.getElementById("territoireSelect").value;
+  document.getElementById("nomTerritoire").textContent = territoire
+  const recordsTerr = dataRecords.filter(r => r.territoire === territoire);
+  const metriqueId = recordsTerr[0].MetriqueId;
+  if (!sidePanel) {
+    await initMetrique(metriqueId);
+  }
+  console.log("refreshMap DGOMMap" + DGOMMap)
+  document.getElementById("info").innerHTML = "";
+  
+  if (!dataRecords.length) {
+    return;
+  }
+
+  const geoRow = territoireRows.find(r => r.territoire === territoire);
+  if (!geoRow) {
+    console.log("pas de geoRow" + territoire + '-')
+    console.log(territoireRows)
+    document.getElementById("info").innerHTML = "problème à la récupération du territoire visé, faites un rafraîchissement de la page"
+    return;
+  }
+  const limiteN = geoRow.limiteN;
+  const limiteS = geoRow.limiteS;  
+  const limiteE = geoRow.limiteE;  
+  const limiteO = geoRow.limiteO;
+
+  const latCentreCarte = DGOMMap ? (geoRow.latCentreCarteDGOM ? geoRow.latCentreCarteDGOM : geoRow.latCentreCarte) : geoRow.latCentreCarte;
+  const longCentreCarte = DGOMMap ? (geoRow.longCentreCarteDGOM ? geoRow.longCentreCarteDGOM : geoRow.longCentreCarte) : geoRow.longCentreCarte;  
+  const zoomCarte = DGOMMap ? (geoRow.zoomCarteDGOM ? geoRow.zoomCarteDGOM : geoRow.zoomCarte) : geoRow.zoomCarte ;   
+
+  const geoJsonDGOMSafe = geoRow.geoJsonDGOM ? geoRow.geoJsonDGOM : geoRow.geoJson
+  const geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
+  const geojson = await loadGeoJson(geoJsonCell);
+  delete geojson.crs
+  let cleanedGeojson = geojson;
+  if (validateGeoJSON(geojson).length > 0) {
+    console.log("*******************************************************************************************")
+    //cleanedGeojson = cleanGeoJSON(geojson);
+    cleanedGeojson = fixGeoJSON(geojson);
+    validateGeoJSON(cleanedGeojson)
+  } 
+  console.log("##########################################################################################################")
+  console.log(geojson);
+console.log(geojson.type);
+  const records = recordsTerr.filter(r => r.MetriqueId === metriqueId);
+  const colorsSet = [...new Set(records.map(r => Number(r.ValeurChoroplethe)))].sort((a, b) => a - b);
+  const colorscale = metriqueCouleurs ? buildColorscale(colorsSet) : metriqueType; 
+  
+  const traces = [];        
+
+  // --- COUCHES CHOROPLETHE (MAPBOX) ---
+  if (showChoroplethe) {
+    let baseChoropleth = {
+    type: 'choroplethmapbox', // Changement ici
+    geojson: cleanedGeojson,
+    locations: records.map(r => String(r.Code_Insee)),
+    featureidkey: 'properties.code_insee',
+    colorscale: colorscale,
+    showscale: false,
+    hoverinfo: 'skip',
+    marker: {
+      line: {
+        color: lineColor,
+        width: 1
+        }
+      }
+    };
+
+    if (metriqueType === "categorie") {
+      baseChoropleth.z = records.map(r => Number(r.ValeurChoroplethe));
+      traces.push(baseChoropleth);
+    } else if (metriqueType === "seuils") {
+      baseChoropleth.z = records.map(r => {
+        const v = Number(r.ValeurChoroplethe);
+        if (v < metriqueSeuil1) return 1;
+        if (v <= metriqueSeuil2) return 2;
+        return 3;
+      });
+      traces.push(baseChoropleth);
+    } else {
+      baseChoropleth.z = records.map(r => {
+        const v = Number(r.ValeurChoroplethe);
+        if (v < metriqueSeuil1) return 1;
+        if (v <= metriqueSeuil2) return 2;
+        return 3;
+      });
+      baseChoropleth.colorscale = metriqueType;
+      baseChoropleth.showscale = true;
+      traces.push(baseChoropleth);
+    }
+  }
+  
+
+  // --- COUCHE POINTS COMMUNES (MAPBOX) ---
+  if (showPoints) {
+    
+    const maxValue = Math.max(...records.map(r => Number(r.ValeurPointCommune)));
+    const markerSizes = records.map(r =>
+      Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3
+    );
+    console.log(records)
+    traces.push({
+      type: 'scattermapbox',
+      lon: DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)),
+      lat: DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)),
+      mode: 'markers',
+      showlegend: false, 
+      marker: {
+        size: markerSizes,
+        color: pointColor,
+        opacity: 0.7,
+        line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
+      },
+      text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
+      hovertemplate: '%{text}<extra></extra>'
+    });
+  }
+
+  // --- COUCHE POINTS Mairie  ---
+  if (showPointsMairies) {    
+    traces.push({
+      type: 'scattermapbox', 
+      lon: DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)),
+      lat: DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)),
+      mode: 'markers',
+      showlegend: false, 
+      marker: {
+        size: pointSizeMairies * 5,
+        color: pointColorMairies,
+        opacity: 1,
+        line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
+      },
+      text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
+      hovertemplate: '%{text}<extra></extra>'
+    });
+  }
+
+  // --- COUCHE POINTS EPCI (MAPBOX) ---
+  if (showPointsEPCI) {
+    const maxValue = Math.max(...records.map(r => Number(r.ValeurPointEPCI)));
+    const uniqueRecords = [
+      ...new Map(records.map(r => [`${r.latEPCI}|${r.longEPCI}`, r])).values()
+    ];
+    const markerSizesEPCI = uniqueRecords.map(r =>
+      Math.sqrt(Number(r.ValeurPointEPCI) / maxValue) * 40 * pointSizeEPCI / 3
+    );
+    traces.push({
+      type: 'scattermapbox', // Changement ici
+      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
+      lat:DGOMMap ?  uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      mode: 'markers',
+      showlegend: false, 
+      marker: {
+        size: markerSizesEPCI,
+        color: pointColorEPCI,
+        opacity: 0.7
+      },
+      // Correction ici : uniqueRecords au lieu de records pour éviter le décalage de taille/texte
+      text: uniqueRecords.map(r => `${r.NomEPCI}<br>${textPointsUnitEPCI} : ${r.ValeurPointEPCI}`),
+      hovertemplate: '%{text}<extra></extra>'
+    });
+  }
+
+  // --- COUCHE TEXTE COMMUNES (MAPBOX) ---
+  if (showText) {
+    console.log("showtext")
+    console.log("showTextMairies" + showTextMairies)
+    console.log("DGOMMap" + DGOMMap)
+    console.log(records)
+    const cou = showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)))
+    console.log(cou)
+    traces.push({
+      type: 'scattermapbox', // Changement ici
+      lon: showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long))),
+      lat: showTextMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie))) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat))),
+      mode: 'text',
+      text: records.map(r => r.Nom),
+      showlegend: false, 
+      textfont: {
+        size: textSize,
+        color: textColor
+      }
+    });
+  }
+
+  if (showGeo) {
+   let uniqueRecords = [] 
+   if (DGOMMap) {
+      uniqueRecords = [
+      ...new Map(records.map(r => [`${r.latGeoDGOM}|${r.longGeoDGOM}`, r])).values()
+    ];
+   } else {
+    uniqueRecords = [
+      ...new Map(records.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
+    ];
+   }
+    console.log(uniqueRecords)
+    traces.push({
+      type: 'scattermapbox', // Changement ici
+      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
+      lat: DGOMMap ? uniqueRecords.map(r => Number(r.latGeoDGOM)) : uniqueRecords.map(r => Number(r.latGeo)),
+      mode: 'text',
+      text: uniqueRecords.map(r => r.nomGeo),
+      showlegend: false, 
+      textfont: {
+        size: 16,
+        color: "#08306B"
+      }
+    });
+  }
+
+  // --- COUCHE TEXTE EPCI (MAPBOX) ---
+  if (showTextEPCI) {
+    const seen = new Set();
+    const uniqueRecords = records.filter(r => {
+      if (seen.has(r.NomEPCI)) return false; // Correction : NomEPCI pour filtrer les doublons d'EPCI, pas Nom de commune
+      seen.add(r.NomEPCI);
+      return true;
+    });
+    traces.push({
+      type: 'scattermapbox', // Changement ici
+      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
+      lat: DGOMMap ? uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      mode: 'text',
+      text: uniqueRecords.map(r => r.NomEPCI),
+      showlegend: false, 
+      textfont: {
+        size: textSizeEPCI,
+        color: textColorEPCI
+      }
+    });
+  }
+  // --- COUCHE LIGNE DE SÉPARATION DEPUIS LE GEOJSON ---
+// On cherche l'entité "ligne" dans les features du GeoJSON
+
+  const config = {
+    displayModeBar: false,
+    scrollZoom: true, // IMPORTANT : Libère le zoom avec la molette de la souris / trackpad
+    responsive: true
+  };
+
+  console.log("Centre  :", latCentreCarte, longCentreCarte, "Zoom :", zoomCarte);
+
+  const layout = {
+    dragmode: "pan",
+    mapbox: {
+      style: showMap ? "open-street-map" : "white-bg",
+      center: { 
+        lat: latCentreCarte, 
+        lon: longCentreCarte 
+      },
+      zoom: zoomCarte
+    },
+    margin: { l: 0, r: 0, t: 0, b: 0 }
+  };
+
+  // Enregistrement du territoire courant pour le prochain clic/refresh
+  dernierTerritoireAffiche = territoire;
+  console.log("traces")
+  console.log(traces)
+  console.log(layout)
+  buildLegend(records);
+  // 1. On utilise .filter() pour récupérer TOUTES les features de type LineString (renvoie un tableau)
+const featuresLignes = cleanedGeojson.features.filter(f => f.geometry.type === "LineString");
+
+// 2. On parcourt le tableau de lignes avec un .forEach()
+featuresLignes.forEach((featureLigne, index) => {
+
+  // Extraction des coordonnées pour la ligne en cours
+  const lonsLigne = featureLigne.geometry.coordinates.map(coord => coord[0]);
+  const latsLigne = featureLigne.geometry.coordinates.map(coord => coord[1]);
+  
+  // On ajoute une trace unique pour cette ligne dans le tableau `traces`
+  traces.push({
+    type: 'scattermapbox',
+    mode: 'lines',
+    lon: lonsLigne,
+    lat: latsLigne,
+    showlegend: false,
+    hoverinfo: 'skip',
+    line: {
+      color: '#c0c0c0', // Couleur grise
+      width: 2          // Épaisseur
+    }
+  });
+});
+  Plotly.react('chart', traces, layout, config);
+
+}
+
+function applySavedValue() {
+  if (!pendingSelectedValue) return;
+
+  select.value = pendingSelectedValue;
+
+  // déclenche le refresh pour être sûr
+  refreshMap();
+}
+
+
+
+grist.onRecords(records => {
+  dataRecords = records;
+  console.log(records)
+  init();
+  refreshMap();
+});
+
+grist.onOptions((options, interaction) => {
+  const savedValue = options?.selectedView;
+  if (savedValue) {
+    // Mettre à jour l'état du dropdown dans l'interface
+    pendingSelectedValue = savedValue;
+    // si le select existe déjà rempli, on applique
+    if (select.options.length > 0) {
+      applySavedValue();
+    }
+  }
+});
+
+
+function buildLegend(records) {
+
+  const legend = document.getElementById("legend");
+  legend.innerHTML = "";
+  const titre = document.createElement("div");
+  titre.className = "legend-titre";
+  titre.innerHTML = `<span>${titreLegende}</span>`
+  legend.appendChild(titre);
+
+
+  
+  const colors = metriqueCouleurs.split(','); 
+
+  // CAS 1 : Catégorie
+  if (metriqueType == "categorie") {
+    
+    const categories = [...new Set(
+      records.map(r => Number(r.ValeurChoroplethe))
+    )].sort((a,b) => a - b);
+    
+    const liste = document.createElement("div");
+    liste.className = "legend-list";
+    legend.appendChild(liste);
+
+    categories.forEach(cat => {
+      const color = colors[cat - 1];
+      const label = records.find(r => Number(r.ValeurChoroplethe) === cat )?.NomEPCI || cat;
+      const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `
+        <div class="legend-color"
+            style="background:${color}">
+        </div>
+        <span class="legend-text">${label}</span>
+      `;
+      liste.appendChild(item);
+    });
+  }
+
+  if (metriqueType === "seuils") {
+    const colors = metriqueCouleurs.split(",");
+    const classes = [
+      {
+        label: `< ${metriqueSeuil1}`,
+        color: colors[0]
+      },
+      {
+        label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
+        color: colors[1]
+      },
+      {
+        label: `> ${metriqueSeuil2}`,
+        color: colors[2]
+      }
+    ];
+
+    classes.forEach(c => {
+
+      const item = document.createElement("div");
+      item.className = "legend-item";
+
+      item.innerHTML = `
+        <div class="legend-color"
+             style="background:${c.color}">
+        </div>
+        <span>${c.label}</span>
+      `;
+
+      legend.appendChild(item);
+    });
+  }
+  if (showPoints) {
+    const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `
+        <div class="legend-point"
+             style="background:${pointColor}">
+        </div>
+        <span class="legend-text">${textPointsUnit}</span>
+      `
+    legend.appendChild(item);
+  }
+  if (showPointsEPCI) {
+    const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `
+        <div class="legend-point"
+             style="background:${pointColorEPCI}">
+        </div>
+        <span class="legend-text">${textPointsUnitEPCI}</span>
+      `
+    legend.appendChild(item);
+  }
+}
+
+function buildColorscale(liste) { 
+  const colors = metriqueCouleurs.split(',');  
+  const scale = []; 
+
+  if (metriqueType === "seuils") { 
+    const n=3
+    for (let i = 0; i < n; i++) {
+      const start = i / n;
+      const end = (i + 1) / n;
+      scale.push([start, colors[i]]);
+      scale.push([end, colors[i]]);
+    }
+  }
+  if (metriqueType === "categorie") {
+    const n = liste.length; 
+    for (let i = 0; i < n; i++) {
+      const start = i / n;
+      const end = (i + 1) / n;
+
+      scale.push([start, colors[i]]);
+      scale.push([end, colors[i]]);
+    }
+  }
+  return scale; 
+}
+
+function downloadImage(dataUrl, filename) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function saveMetricOptions() {
+
+  if (!currentMetriqueId) {
+    alert("Aucune métrique sélectionnée");
+    return;
+  }
+
+  try {
+
+    const table = grist.getTable("Metriques");
+
+    await table.update({
+      id: currentMetriqueId,
+      fields: {
+        AfficherChoroplethe: showChoroplethe,
+        AfficherNomCommunes: showText,
+        AfficherNomEPCI: showTextEPCI,
+        AfficherPointsCommunes: showPoints,   
+        AfficherPointsMairies: showPointsMairies,   
+        AfficherPointsEPCI: showPointsEPCI,
+        TailleTexteCommunes: textSize,
+        CouleurTexteCommunes: textColor,
+        TaillePointCommunes: pointSize,
+        CouleurPointCommunes: pointColor,
+        TaillePointMairies: pointSizeMairies,
+        CouleurPointMairies: pointColorMairies,
+        TailleTexteEPCI: textSizeEPCI,
+        CouleurTexteEPCI: textColorEPCI,
+        TaillePointEPCI: pointSizeEPCI,
+        CouleurPointEPCI: pointColorEPCI,
+        CouleurLigne: lineColor,
+        MontrerLeFond: showMap,
+        CarteDGOM: DGOMMap,
+        AfficherGeographie: showGeo
+      }
+    });
+
+    alert("Options enregistrées dans la métrique");
+
+  } catch(err) {
+
+    console.error(err);
+    alert("Erreur lors de l'enregistrement");
+  }
+}
+
+
+async function getUtilisateur() {
+    let utilisateurs = await grist.docApi.fetchTable("Utilisateurs");
+    // Trouver le territoire et les opérations de l'utilisateur connecté
+      utilisateurs.id.forEach((id, i) => {        
+          if (utilisateurs['Moi'][i] === true) {
+            entiteId = utilisateurs['Entite'][i];
+            role = utilisateurs['Role'][i];
+            return 1;
+          }
+      });
+      
+      return 0
+}
+function validateGeoJSON(fc) {
+  const errors = [];
+
+  fc.features.forEach((feature, index) => {
+    const result = validateFeature(feature);
+    if (!result.valid) {
+      errors.push({
+        feature: index,
+        ...result
+      });
+    }
+    
+  });
+  console.log("'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''")
+  console.log(errors)
+  return errors;
+}
+
+function cleanGeoJSON(fc) {
+  return {
+    ...fc,
+    features: fc.features.map(feature => {
+      if (!feature.geometry) return feature;
+      
+      if (feature.geometry.type === 'Polygon') {
+        return {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            // Garder uniquement le premier ring (contour extérieur)
+            coordinates: [feature.geometry.coordinates[0]]
+          }
+        };
+      }
+      
+      if (feature.geometry.type === 'MultiPolygon') {
+        return {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            coordinates: feature.geometry.coordinates.map(polygon => [polygon[0]])
+          }
+        };
+      }
+      
+      return feature;
+    })
+  };
+}
+
+function ringArea(coords) {
+  let area = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    area += (coords[i][0] * coords[i+1][1]) - (coords[i+1][0] * coords[i][1]);
+  }
+  return area / 2;
+}
+
+function fixPolygonWindings(coordinates) {
+  return coordinates.map((ring, index) => {
+    const area = ringArea(ring);
+    if (index === 0 && area < 0) return [...ring].reverse(); // extérieur = CCW
+    if (index > 0 && area > 0) return [...ring].reverse();   // trou = CW
+    return ring;
+  });
+}
+
+function fixGeoJSON(fc) {
+  return {
+    ...fc,
+    features: fc.features.map(feature => {
+      if (!feature.geometry) return feature;
+
+      if (feature.geometry.type === 'Polygon') {
+        return {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            coordinates: fixPolygonWindings(feature.geometry.coordinates)
+          }
+        };
+      }
+
+      if (feature.geometry.type === 'MultiPolygon') {
+        return {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            coordinates: feature.geometry.coordinates.map(fixPolygonWindings)
+          }
+        };
+      }
+
+      return feature;
+    })
+  };
+}
+
+
+function validateFeature(feature) {
+  try {
+    const reader = new jsts.io.GeoJSONReader();
+    const geom = reader.read(feature.geometry);
+
+    const validator = new jsts.operation.valid.IsValidOp(geom);
+
+    const error = validator.getValidationError();
+
+    if (error) {
+      return {
+        valid: false,
+        message: error.getMessage(),
+        coordinate: error.getCoordinate()
+      };
+    }
+
+    return { valid: true };
+
+  } catch (e) {
+    return {
+      valid: false,
+      message: e.message
+    };
+  }
+}
+
+function syncShowMap() {
+  if (DGOMMapSwitch.checked) {
+    showMapSwitch.checked = false;   // on décoche
+    showMap = false;
+    showMapSwitch.disabled = true;   // on désactive l’interaction
+  } else {
+    showMapSwitch.disabled = false;  // on réactive l’interaction
+    // le statut de showMap (coché / décoché) est conservé tel qu’il était
+  }
+}
+
+document
+  .getElementById("saveMetricBtn")
+  .addEventListener("click", saveMetricOptions);
+
+</script>
+
+</body>
+</html>
