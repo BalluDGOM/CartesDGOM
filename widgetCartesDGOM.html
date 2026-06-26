@@ -754,6 +754,7 @@ async function initMetrique(metriqueId) {
       textColor: ref.CouleurTexteCommunes[i],
       pointSize: ref.TaillePointCommunes[i],
       pointColor: ref.CouleurPointCommunes[i],
+      popPourPtCommunes: ref.PopPourPtCommunes[i],
       
       pointSizeMairies: ref.TaillePointMairies[i],
       pointColorMairies: ref.CouleurPointMairies[i],
@@ -762,6 +763,7 @@ async function initMetrique(metriqueId) {
       textColorEPCI: ref.CouleurTexteEPCI[i],
       pointSizeEPCI: ref.TaillePointEPCI[i],
       pointColorEPCI: ref.CouleurPointEPCI[i],
+      popPourPtEPCI: ref.PopPourPtEPCI[i],
 
       lineColor: ref.CouleurLigne[i],
       showMap: ref.MontrerLeFond[i],
@@ -781,11 +783,14 @@ async function initMetrique(metriqueId) {
 
       showPoints = row.afficherPointsCommunes ;
       textPointsUnit = row.dimensionPointsCommunes ;
+      popPourPtCommunes = row.popPourPtCommunes ;
 
       showPointsMairies = row.afficherPointsMairies ;  
 
       showPointsEPCI = row.afficherPointsEPCI ;
       textPointsUnitEPCI = row.dimensionPointsEPCI ; 
+      popPourPtEPCI = row.popPourPtEPCI ;
+
       showGeo = row.showGeo ;
       metriqueType = row.type ;
       metriqueSeuil1 = row.seuil1 ;
@@ -1036,10 +1041,9 @@ async function refreshMap(sidePanel) {
     document.getElementById("info").innerHTML = "problème à la récupération du territoire visé, faites un rafraîchissement de la page"
     return;
   }
-  const limiteN = geoRow.limiteN;
-  const limiteS = geoRow.limiteS;  
-  const limiteE = geoRow.limiteE;  
-  const limiteO = geoRow.limiteO;
+
+  const fmt = new Intl.NumberFormat('fr-FR');   // → utilise «  » (espace insécable) entre les groupes
+
 
   const latCentreCarte = DGOMMap ? (geoRow.latCentreCarteDGOM ? geoRow.latCentreCarteDGOM : geoRow.latCentreCarte) : geoRow.latCentreCarte;
   const longCentreCarte = DGOMMap ? (geoRow.longCentreCarteDGOM ? geoRow.longCentreCarteDGOM : geoRow.longCentreCarte) : geoRow.longCentreCarte;  
@@ -1110,12 +1114,20 @@ console.log(geojson.type);
 
   // --- COUCHE POINTS COMMUNES (MAPBOX) ---
   if (showPoints) {
+    let maxValue;
+    let markerSizes;
+    if (popPourPtCommunes) {
+      console.log("population")
+      maxValue = Math.max(...records.map(r => Number(r.ValeurPop)));
+      markerSizes = records.map(r =>
+      Math.sqrt(Number(r.ValeurPop) / maxValue) * 40 * pointSize / 3 );
+    } else {
+      maxValue = Math.max(...records.map(r => Number(r.ValeurPointCommune)));
+      markerSizes = records.map(r =>
+      Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
+      console.log("pas population")
+    }
     
-    const maxValue = Math.max(...records.map(r => Number(r.ValeurPointCommune)));
-    const markerSizes = records.map(r =>
-      Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3
-    );
-    console.log(records)
     traces.push({
       type: 'scattermapbox',
       lon: DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)),
@@ -1128,7 +1140,7 @@ console.log(geojson.type);
         opacity: 0.7,
         line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
       },
-      text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
+      text: popPourPtCommunes ? records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPop)}`) : records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPointCommune)}`),
       hovertemplate: '%{text}<extra></extra>'
     });
   }
@@ -1147,20 +1159,31 @@ console.log(geojson.type);
         opacity: 1,
         line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
       },
-      text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
-      hovertemplate: '%{text}<extra></extra>'
+      //text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
+      //hovertemplate: '%{text}<extra></extra>'
+      hoverinfo: 'skip'
     });
   }
 
   // --- COUCHE POINTS EPCI (MAPBOX) ---
   if (showPointsEPCI) {
-    const maxValue = Math.max(...records.map(r => Number(r.ValeurPointEPCI)));
+    let maxValueEPCI;
+    let markerSizesEPCI;
     const uniqueRecords = [
       ...new Map(records.map(r => [`${r.latEPCI}|${r.longEPCI}`, r])).values()
     ];
-    const markerSizesEPCI = uniqueRecords.map(r =>
-      Math.sqrt(Number(r.ValeurPointEPCI) / maxValue) * 40 * pointSizeEPCI / 3
-    );
+    if (popPourPtEPCI) {
+      console.log("populationEPCI")
+      maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPopEPCI)));
+      markerSizesEPCI  = uniqueRecords.map(r =>
+      Math.sqrt(Number(r.ValeurPopEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
+    } else {
+      maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPointEPCI)));
+      markerSizesEPCI  = uniqueRecords.map(r =>
+      Math.sqrt(Number(r.ValeurPointEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
+      console.log("pas populationEPCI")
+    }
+
     traces.push({
       type: 'scattermapbox', // Changement ici
       lon: DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
@@ -1173,7 +1196,7 @@ console.log(geojson.type);
         opacity: 0.7
       },
       // Correction ici : uniqueRecords au lieu de records pour éviter le décalage de taille/texte
-      text: uniqueRecords.map(r => `${r.NomEPCI}<br>${textPointsUnitEPCI} : ${r.ValeurPointEPCI}`),
+      text: popPourPtEPCI ? uniqueRecords.map(r => `${r.NomEPCI}<br>${textPointsUnitEPCI} : ${fmt.format(r.ValeurPopEPCI)}`) : uniqueRecords.map(r => `${r.Nom}<br>${textPointsUnitEPCI} : ${fmt.format(r.ValeurPointEPCI)}`),
       hovertemplate: '%{text}<extra></extra>'
     });
   }
@@ -1196,7 +1219,8 @@ console.log(geojson.type);
       textfont: {
         size: textSize,
         color: textColor
-      }
+      },
+      hoverinfo: 'skip',
     });
   }
 
@@ -1244,7 +1268,8 @@ console.log(geojson.type);
       textfont: {
         size: textSizeEPCI,
         color: textColorEPCI
-      }
+      },
+      hoverinfo: 'skip',
     });
   }
   // --- COUCHE LIGNE DE SÉPARATION DEPUIS LE GEOJSON ---
@@ -1355,14 +1380,12 @@ function buildLegend(records) {
     const categories = [...new Set(
       records.map(r => Number(r.ValeurChoroplethe))
     )].sort((a,b) => a - b);
-    
     const liste = document.createElement("div");
     liste.className = "legend-list";
     legend.appendChild(liste);
-
     categories.forEach(cat => {
       const color = colors[cat - 1];
-      const label = records.find(r => Number(r.ValeurChoroplethe) === cat )?.NomEPCI || cat;
+      const label = records.find(r => Number(r.ValeurChoroplethe) == cat )?.NomEPCI || cat;
       const item = document.createElement("div");
       item.className = "legend-item";
       item.innerHTML = `
