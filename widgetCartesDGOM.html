@@ -201,10 +201,10 @@
         font-weight: 400;
     }
     /* Texte des options */
-    .options-text {
+   /* .options-text {
         font-size: 8px;
         font-weight: 400;
-    }
+    }*/
 
     /* Couleurs et points */
     .legend-color,
@@ -348,13 +348,22 @@
         align-items: center;
         gap: 10px;
     }
-
+    .options-text { 
+        color: #08306B !important; /* Force la couleur bleu foncé au cas où un autre style l'écrase */
+        font-size: 10px; 
+        min-width: 24px; 
+        text-align: right; 
+        flex-shrink: 0; 
+        display: inline-block; /* Assure que la largeur minimale est respectée */
+    }
     .font-size-control label {
         white-space: nowrap;
+        flex: 1;
     }
 
     .font-size-control input[type="range"] {
-        flex: 1;
+        flex: 2;
+        min-width: 50px;
     }
 
     .titre {
@@ -411,6 +420,11 @@
       <div class="color-row">
         <label for="lineColorPicker">Couleur des lignes :</label>
         <input type="color" id="lineColorPicker" value="#000000">
+      </div>
+      <div class="font-size-control">
+        <label for="lineWidthSlider">Épaisseur de la ligne :</label>
+        <input type="range" id="lineWidthSlider" min="0" max="5" value="1">
+        <span id="lineWidthValue" class="options-text">1</span>
       </div>
     </div>
     <hr class="separator">
@@ -588,6 +602,7 @@ grist.ready({
     { name: "PopPourPtEPCI", type: "Any", title: "Pop Pour Pt EPCI" },
     
     { name: "CouleurLigne", type: "Any", title: "Couleur Ligne" },
+    { name: "EpaisseurLigne", type: "Numeric", title: "Epaisseur Ligne" },
     { name: "MontrerLeFond", type: "Bool", title: "Montrer le Fond" },
     { name: "CarteDGOM", type: "Bool", title: "Carte DGOM" },
     { name: "Entite", type: "Any", title: "Entité" },
@@ -627,6 +642,7 @@ let textSizeEPCI = 12;
 let textColor = "#000000";
 let textColorEPCI = "#000000";
 let lineColor;
+let lineWidth;
 let pointColor = "#000000";
 let pointColorEPCI = "#000000";
 let toolbarVisible = true;
@@ -666,6 +682,9 @@ const fontSizeValueEPCI = document.getElementById("fontSizeValueEPCI");
 const textColorPickerEPCI = document.getElementById("textColorPickerEPCI");
 
 const lineColorPicker = document.getElementById("lineColorPicker");
+const lineWidthSlider = document.getElementById("lineWidthSlider");
+const lineWidthValue = document.getElementById("lineWidthValue");
+
 
 const pointColorPicker = document.getElementById("pointColorPicker");
 const pointColorPickerMairie = document.getElementById("pointColorPickerMairie");
@@ -833,6 +852,7 @@ async function initMetrique(metriqueId) {
       popPourPtEPCI: ref.PopPourPtEPCI[i],
 
       lineColor: ref.CouleurLigne[i],
+      lineWidth: ref.EpaisseurLigne[i],
       showMap: ref.MontrerLeFond[i],
       DGOMMap: ref.CarteDGOM[i],
       entite: ref.Entite[i],
@@ -883,6 +903,7 @@ async function initMetrique(metriqueId) {
       pointColorEPCI = row.pointColorEPCI ?? "#000000";
 
       lineColor = row.lineColor ?? "#000000";
+      lineWidth = row.lineWidth ?? 1;
       showMap = row.showMap ?? false;
       DGOMMap = row.DGOMMap ?? false;
       entiteMetrique = row.entite;
@@ -921,6 +942,7 @@ async function initMetrique(metriqueId) {
      
 
       lineColorPicker.value = lineColor;
+      lineWidthSlider.value = lineWidth;
       showGeoValue.checked = showGeo;
       showMapSwitch.checked = showMap;
       DGOMMapSwitch.checked = DGOMMap;
@@ -1055,6 +1077,11 @@ async function init() {
       lineColor = e.target.value;
       refreshMap(true);
     });
+  lineWidthSlider.addEventListener("input", (e) => {
+      lineWidth = Number(e.target.value);
+      lineWidthValue.textContent = lineWidth;
+      refreshMap(true);
+    });
   pointColorPicker.addEventListener("input", (e) => {
       pointColor = e.target.value;
       refreshMap(true);
@@ -1168,7 +1195,7 @@ async function refreshMap(sidePanel) {
     marker: {
       line: {
         color: lineColor,
-        width: 1
+        width: lineWidth
         }
       }
     };
@@ -1607,6 +1634,7 @@ async function saveMetricOptions() {
         TaillePointEPCI: pointSizeEPCI,
         CouleurPointEPCI: pointColorEPCI,
         CouleurLigne: lineColor,
+        EpaisseurLigne: lineWidth,
         MontrerLeFond: showMap,
         CarteDGOM: DGOMMap,
         AfficherGeographie: showGeo
