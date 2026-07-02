@@ -77,8 +77,8 @@
     #info {
       position: absolute;
       background: orange;
-      top: 120px;
-      left: 50px;
+      top: 60px;
+      left: 200px;
       border: none;
       font-size: 22px;
     }
@@ -423,7 +423,7 @@
       </div>
       <div class="font-size-control">
         <label for="lineWidthSlider">Épaisseur de la ligne :</label>
-        <input type="range" id="lineWidthSlider" min="0" max="5" value="1">
+        <input type="range" id="lineWidthSlider" min="0" max="30" value="1">
         <span id="lineWidthValue" class="options-text">1</span>
       </div>
     </div>
@@ -613,6 +613,7 @@ grist.ready({
 let token;
 let baseUrl;
 let territoire;
+let franceAll = false;
 let dataRecords = [];
 let territoireRows = [];
 let select = document.getElementById("territoireSelect");
@@ -962,6 +963,7 @@ async function initMetrique(metriqueId) {
       document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);   // true → ajoute la classe, false → la retire
       document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
     }
+    syncShowMap();
     console.log(metriqueRows)
   });
  
@@ -983,6 +985,8 @@ async function init() {
       territoire: ref.Nom[i],
       geoJson: ref.GeoJson[i],
       geoJsonDGOM: ref.GeoJsonDGOM[i],
+      geoJsonDGOM2: ref.GeoJsonDGOM2[i],
+      estFranceAll: ref.estFranceAll[i],
       limiteN: ref.LimiteN[i],
       limiteS: ref.LimiteS[i],
       limiteE: ref.LimiteE[i],
@@ -1123,7 +1127,9 @@ async function refreshMap(sidePanel) {
   
   
   territoire = document.getElementById("territoireSelect").value;
+  console.log("territoire :" + territoire)
   const geoRow = territoireRows.find(r => r.territoire === territoire);
+  console.log(geoRow)
   if (!geoRow) {
     console.log("pas de geoRow" + territoire + '-')
     console.log(territoireRows)
@@ -1131,8 +1137,14 @@ async function refreshMap(sidePanel) {
     Plotly.purge('chart');
     return;
   }
-
-  const recordsTerr = dataRecords.filter(r => r.territoire === territoire);
+  console.log(dataRecords)
+  let recordsTerr 
+  if (geoRow.estFranceAll) {
+    franceAll = true ;
+    recordsTerr = dataRecords
+  } else {
+    recordsTerr = dataRecords.filter(r => r.territoire === territoire);
+  }
   if (recordsTerr.length == 0) {
     document.getElementById("info").innerHTML = "Pas de données à afficher : il faut qu'il y ait des données pour le couple territoire/métrique";
     Plotly.purge('chart');
@@ -1143,27 +1155,27 @@ async function refreshMap(sidePanel) {
     await initMetrique(metriqueId);
   }
   document.getElementById("info").innerHTML = "";
-  
-  
-  if (!dataRecords.length) {
-    return;
-  }
-
-
-  //if (metriqueNom && territoire) {document.getElementById("titre").innerHTML =  territoire + " - " + metriqueNom;}
   document.getElementById("titre").innerHTML =  territoire + " - " + metriqueNom;
 
-  
-
   const fmt = new Intl.NumberFormat('fr-FR');   // → utilise «  » (espace insécable) entre les groupes
-
-
   const latCentreCarte = DGOMMap ? (geoRow.latCentreCarteDGOM ? geoRow.latCentreCarteDGOM : geoRow.latCentreCarte) : geoRow.latCentreCarte;
   const longCentreCarte = DGOMMap ? (geoRow.longCentreCarteDGOM ? geoRow.longCentreCarteDGOM : geoRow.longCentreCarte) : geoRow.longCentreCarte;  
   const zoomCarte = DGOMMap ? (geoRow.zoomCarteDGOM ? geoRow.zoomCarteDGOM : geoRow.zoomCarte) : geoRow.zoomCarte ;   
 
   const geoJsonDGOMSafe = geoRow.geoJsonDGOM ? geoRow.geoJsonDGOM : geoRow.geoJson
-  const geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
+  let geoJsonCell
+  if (franceAll) {
+    console.log("france ALl")
+    geoJsonCell = geoRow.geoJsonDGOM2
+    DGOMMapSwitch.checked = true;
+    DGOMMap = true ;
+    syncShowMap();
+  } else {
+    console.log("NOT france ALl")
+    geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
+    
+  }
+
   const geojson = await loadGeoJson(geoJsonCell);
   delete geojson.crs
   let cleanedGeojson = geojson;
@@ -1195,7 +1207,7 @@ async function refreshMap(sidePanel) {
     marker: {
       line: {
         color: lineColor,
-        width: lineWidth
+        width: lineWidth/10
         }
       }
     };
@@ -1214,9 +1226,7 @@ async function refreshMap(sidePanel) {
     } else {
       baseChoropleth.z = records.map(r => {
         const v = Number(r.ValeurChoroplethe);
-        if (v < metriqueSeuil1) return 1;
-        if (v <= metriqueSeuil2) return 2;
-        return 3;
+        return v;
       });
       baseChoropleth.colorscale = metriqueType;
       baseChoropleth.showscale = true;
@@ -1240,11 +1250,14 @@ async function refreshMap(sidePanel) {
       Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
       console.log("pas population")
     }
-
+    console.log('latitudes')
+    console.log(franceAll ? records.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ))
+    console.log('longitudes')
+    console.log(franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ))
     traces.push({
       type: 'scattermapbox',
-      lon: showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
-      lat: showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ),
+      lon:  franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
+      lat: franceAll ? records.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1299,8 +1312,8 @@ async function refreshMap(sidePanel) {
 
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
-      lat:DGOMMap ?  uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      lon: franceAll ? uniqueRecords.map(r => Number(r.longEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latEPCIDGOM2)) : DGOMMap ?  uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1318,8 +1331,8 @@ async function refreshMap(sidePanel) {
   if (showText) {    
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long))),
-      lat: showTextMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie))) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat))),
+      lon: franceAll ? records.map(r => Number(r.longDGOM2)) : showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long))),
+      lat: franceAll ? records.map(r => Number(r.latDGOM2)) : showTextMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie))) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat))),
       mode: 'text',
       text: records.map(r => r.Nom),
       showlegend: false, 
@@ -1345,8 +1358,8 @@ async function refreshMap(sidePanel) {
     console.log(uniqueRecords)
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
-      lat: DGOMMap ? uniqueRecords.map(r => Number(r.latGeoDGOM)) : uniqueRecords.map(r => Number(r.latGeo)),
+      lon: franceAll ? uniqueRecords.map(r => Number(r.longGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.latGeoDGOM)) : uniqueRecords.map(r => Number(r.latGeo)),
       mode: 'text',
       text: uniqueRecords.map(r => r.nomGeo),
       showlegend: false, 
@@ -1367,8 +1380,8 @@ async function refreshMap(sidePanel) {
     });
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
-      lat: DGOMMap ? uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      lon:  franceAll ? uniqueRecords.map(r => Number(r.longEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
       mode: 'text',
       text: uniqueRecords.map(r => r.NomEPCI),
       showlegend: false, 
@@ -1429,7 +1442,7 @@ featuresLignes.forEach((featureLigne, index) => {
     hoverinfo: 'skip',
     line: {
       color: '#c0c0c0', // Couleur grise
-      width: 2          // Épaisseur
+      width: 1          // Épaisseur
     }
   });
 });
@@ -1792,10 +1805,12 @@ function validateFeature(feature) {
 
 function syncShowMap() {
   if (DGOMMapSwitch.checked) {
+    console.log("syncShowMap DGOM")
     showMapSwitch.checked = false;   // on décoche
     showMap = false;
     showMapSwitch.disabled = true;   // on désactive l’interaction
   } else {
+    console.log("syncShowMap NOT DGOM")
     showMapSwitch.disabled = false;  // on réactive l’interaction
     // le statut de showMap (coché / décoché) est conservé tel qu’il était
   }
