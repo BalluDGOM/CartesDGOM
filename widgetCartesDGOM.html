@@ -809,9 +809,6 @@ async function initMetrique(metriqueId) {
   const ref =  await grist.docApi.fetchTable("Metriques");
   currentMetriqueId = metriqueId;
 
-  console.log("metreique")
-  console.log(ref)
-
   metriqueRows =
     ref.id.map((_, i) => ({
       id: ref.id[i],
@@ -964,7 +961,6 @@ async function initMetrique(metriqueId) {
       document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
     }
     syncShowMap();
-    console.log(metriqueRows)
   });
  
     
@@ -987,6 +983,7 @@ async function init() {
       geoJsonDGOM: ref.GeoJsonDGOM[i],
       geoJsonDGOM2: ref.GeoJsonDGOM2[i],
       estFranceAll: ref.estFranceAll[i],
+      dansFranceAll: ref.dansFranceAll[i],
       limiteN: ref.LimiteN[i],
       limiteS: ref.LimiteS[i],
       limiteE: ref.LimiteE[i],
@@ -997,6 +994,11 @@ async function init() {
       latCentreCarteDGOM: ref.LatCentreCarteDGOM[i],
       longCentreCarteDGOM: ref.LongCentreCarteDGOM[i],
       zoomCarteDGOM: ref.ZoomCarteDGOM[i],
+      latDGOM2: ref.latDGOM2[i],
+      longDGOM2: ref.longDGOM2[i],
+      libelle: ref.libelle[i],
+      tailleLibelle: ref.tailleLibelle[i],
+      couleurLibelle: ref.couleurLibelle[i],
     })); 
   console.log("territoireRows") 
   console.log(territoireRows)
@@ -1123,16 +1125,12 @@ async function init() {
     });
 }
 
-async function refreshMap(sidePanel) {
-  
-  
+async function refreshMap(sidePanel) {  
   territoire = document.getElementById("territoireSelect").value;
   console.log("territoire :" + territoire)
   const geoRow = territoireRows.find(r => r.territoire === territoire);
   console.log(geoRow)
   if (!geoRow) {
-    console.log("pas de geoRow" + territoire + '-')
-    console.log(territoireRows)
     document.getElementById("info").innerHTML = "problème à la récupération du territoire visé, faites un rafraîchissement de la page"
     Plotly.purge('chart');
     return;
@@ -1164,34 +1162,25 @@ async function refreshMap(sidePanel) {
 
   const geoJsonDGOMSafe = geoRow.geoJsonDGOM ? geoRow.geoJsonDGOM : geoRow.geoJson
   let geoJsonCell
-  if (franceAll) {
-    console.log("france ALl")
+  if (franceAll) { //France entière => carte DGOM
     geoJsonCell = geoRow.geoJsonDGOM2
     DGOMMapSwitch.checked = true;
     DGOMMap = true ;
     syncShowMap();
   } else {
-    console.log("NOT france ALl")
     geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
-    
   }
 
   const geojson = await loadGeoJson(geoJsonCell);
   delete geojson.crs
   let cleanedGeojson = geojson;
   if (validateGeoJSON(geojson).length > 0) {
-    console.log("*******************************************************************************************")
-    //cleanedGeojson = cleanGeoJSON(geojson);
     cleanedGeojson = fixGeoJSON(geojson);
     validateGeoJSON(cleanedGeojson)
   } 
-  console.log("##########################################################################################################")
-  console.log(geojson);
-  console.log(geojson.type);
   const records = recordsTerr.filter(r => r.MetriqueId === metriqueId);
   const colorsSet = [...new Set(records.map(r => Number(r.ValeurChoroplethe)))].sort((a, b) => a - b);
   const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
-  
   const traces = [];        
 
   // --- COUCHES CHOROPLETHE (MAPBOX) ---
@@ -1240,7 +1229,6 @@ async function refreshMap(sidePanel) {
     let maxValue;
     let markerSizes;
     if (popPourPtCommunes) {
-      console.log("population")
       maxValue = Math.max(...records.map(r => Number(r.ValeurPop)));
       markerSizes = records.map(r =>
       Math.sqrt(Number(r.ValeurPop) / maxValue) * 40 * pointSize / 3 );
@@ -1248,12 +1236,7 @@ async function refreshMap(sidePanel) {
       maxValue = Math.max(...records.map(r => Number(r.ValeurPointCommune)));
       markerSizes = records.map(r =>
       Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
-      console.log("pas population")
     }
-    console.log('latitudes')
-    console.log(franceAll ? records.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ))
-    console.log('longitudes')
-    console.log(franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ))
     traces.push({
       type: 'scattermapbox',
       lon:  franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
@@ -1264,7 +1247,7 @@ async function refreshMap(sidePanel) {
         size: markerSizes,
         color: pointColor,
         opacity: 0.7,
-        line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
+        line: { width: 1, color: 'white' } 
       },
       text: popPourPtCommunes ? records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPop)}`) : records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPointCommune)}`),
       hovertemplate: '%{text}<extra></extra>'
@@ -1285,8 +1268,6 @@ async function refreshMap(sidePanel) {
         opacity: 1,
         line: { width: 1, color: 'white' } // Note : Mapbox gère parfois mal les contours de markers natifs, l'alternative est de doubler la trace
       },
-      //text: records.map(r => `${r.Nom}<br>${textPointsUnit} : ${r.ValeurPointCommune}`),
-      //hovertemplate: '%{text}<extra></extra>'
       hoverinfo: 'skip'
     });
   }
@@ -1299,7 +1280,6 @@ async function refreshMap(sidePanel) {
       ...new Map(records.map(r => [`${r.latEPCI}|${r.longEPCI}`, r])).values()
     ];
     if (popPourPtEPCI) {
-      console.log("populationEPCI")
       maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPopEPCI)));
       markerSizesEPCI  = uniqueRecords.map(r =>
       Math.sqrt(Number(r.ValeurPopEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
@@ -1307,7 +1287,6 @@ async function refreshMap(sidePanel) {
       maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPointEPCI)));
       markerSizesEPCI  = uniqueRecords.map(r =>
       Math.sqrt(Number(r.ValeurPointEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
-      console.log("pas populationEPCI")
     }
 
     traces.push({
@@ -1345,17 +1324,16 @@ async function refreshMap(sidePanel) {
   }
 
   if (showGeo) {
-   let uniqueRecords = [] 
-   if (DGOMMap) {
+    let uniqueRecords = [] 
+    if (DGOMMap) {
+        uniqueRecords = [
+        ...new Map(records.map(r => [`${r.latGeoDGOM}|${r.longGeoDGOM}`, r])).values()
+      ];
+    } else {
       uniqueRecords = [
-      ...new Map(records.map(r => [`${r.latGeoDGOM}|${r.longGeoDGOM}`, r])).values()
-    ];
-   } else {
-    uniqueRecords = [
-      ...new Map(records.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
-    ];
-   }
-    console.log(uniqueRecords)
+        ...new Map(records.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
+      ];
+    }
     traces.push({
       type: 'scattermapbox', // Changement ici
       lon: franceAll ? uniqueRecords.map(r => Number(r.longGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
@@ -1401,8 +1379,6 @@ async function refreshMap(sidePanel) {
     responsive: true
   };
 
-  console.log("Centre  :", latCentreCarte, longCentreCarte, "Zoom :", zoomCarte);
-
   const layout = {
     dragmode: "pan",
     mapbox: {
@@ -1420,32 +1396,52 @@ async function refreshMap(sidePanel) {
   dernierTerritoireAffiche = territoire;
   console.log("traces")
   console.log(traces)
-  console.log(layout)
   buildLegend(records);
   // 1. On utilise .filter() pour récupérer TOUTES les features de type LineString (renvoie un tableau)
 const featuresLignes = cleanedGeojson.features.filter(f => f.geometry.type === "LineString");
 
 // 2. On parcourt le tableau de lignes avec un .forEach()
 featuresLignes.forEach((featureLigne, index) => {
+      // Extraction des coordonnées pour la ligne en cours
+      const lonsLigne = featureLigne.geometry.coordinates.map(coord => coord[0]);
+      const latsLigne = featureLigne.geometry.coordinates.map(coord => coord[1]);
+      
+      // On ajoute une trace unique pour cette ligne dans le tableau `traces`
+      traces.push({
+        type: 'scattermapbox',
+        mode: 'lines',
+        lon: lonsLigne,
+        lat: latsLigne,
+        showlegend: false,
+        hoverinfo: 'skip',
+        line: {
+          color: '#c0c0c0', // Couleur grise
+          width: 1          // Épaisseur
+        }
+      });
+    });
 
-  // Extraction des coordonnées pour la ligne en cours
-  const lonsLigne = featureLigne.geometry.coordinates.map(coord => coord[0]);
-  const latsLigne = featureLigne.geometry.coordinates.map(coord => coord[1]);
-  
-  // On ajoute une trace unique pour cette ligne dans le tableau `traces`
-  traces.push({
-    type: 'scattermapbox',
-    mode: 'lines',
-    lon: lonsLigne,
-    lat: latsLigne,
-    showlegend: false,
-    hoverinfo: 'skip',
-    line: {
-      color: '#c0c0c0', // Couleur grise
-      width: 1          // Épaisseur
-    }
-  });
-});
+  // France entière : affichage du nom des territoires (from refTerritoire)
+
+  if (franceAll) {
+    const territoiresAffiches = territoireRows.filter(r => r.dansFranceAll === true)
+    
+    territoiresAffiches.forEach(r => {
+      traces.push({
+        type: 'scattermapbox',
+        lon: [Number(r.longDGOM2)],
+        lat: [Number(r.latDGOM2)],
+        mode: 'text',
+        text: [r.libelle],
+        showlegend: false, 
+        textfont: {
+          size: Number(r.tailleLibelle),       
+          color: r.couleurLibelle,          
+        },
+        hoverinfo: 'skip',
+      });
+    });
+  }
   Plotly.react('chart', traces, layout, config);
 
 }
@@ -1690,8 +1686,6 @@ function validateGeoJSON(fc) {
     }
     
   });
-  console.log("'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''")
-  console.log(errors)
   return errors;
 }
 
@@ -1805,12 +1799,10 @@ function validateFeature(feature) {
 
 function syncShowMap() {
   if (DGOMMapSwitch.checked) {
-    console.log("syncShowMap DGOM")
     showMapSwitch.checked = false;   // on décoche
     showMap = false;
     showMapSwitch.disabled = true;   // on désactive l’interaction
   } else {
-    console.log("syncShowMap NOT DGOM")
     showMapSwitch.disabled = false;  // on réactive l’interaction
     // le statut de showMap (coché / décoché) est conservé tel qu’il était
   }
