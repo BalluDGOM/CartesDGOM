@@ -44,7 +44,7 @@
     /* Le conteneur principal à gauche */
     #sidebar {
       position: fixed;
-      top: 10px; /* Aligné sur le haut du layout */
+      top: 10px; 
       left: 20px;
       z-index: 10000;
       
@@ -56,8 +56,6 @@
       display: flex;
       flex-direction: column;
       align-items: left;
-      
-      /* RÉPARTITION : Pousse la caméra en haut, les options en bas, le texte au milieu */
       justify-content: space-between; 
       
       width: 100px;
@@ -166,7 +164,6 @@
     #legend {
       width: 150px;
       padding: 10px;
-     // border-left: 1px solid #ddd;
       display: flex;
       flex-direction: column;
       //align-items: center;
@@ -219,23 +216,7 @@
     .legend-point {
         border-radius: 50%;
     }
-   /* .legend-text {
-      font-size: 10px;
-      font-weight: 400;
-    }
-
-    .legend-color {
-      width: 16px;
-      height: 16px;
-      border: 1px solid #666;
-      flex-shrink: 0;
-    }
-    .legend-point {
-      width: 16px;
-      height: 16px; 
-      border-radius: 50%;
-      flex-shrink: 0;
-    }*/
+   
     .js-plotly-plot .modebar {
       top: 40px !important;   /* décale vers le bas */
       right: 50px !important;
@@ -653,8 +634,6 @@ let sidePanel = false;
 let entiteId = 0;
 let role = "";
 let dernierTerritoireAffiche = null;
-
-
 
 const showChoropletheValue = document.getElementById("showChoropletheValue");
 
