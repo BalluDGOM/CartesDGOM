@@ -9,7 +9,7 @@
 
   <style>
     html, body {
-      margin: 0;
+      margin: 0;F
       height: 100%;
       font-family: "Marianne", Arial, sans-serif;
       color: #08306B;
@@ -44,7 +44,7 @@
     /* Le conteneur principal à gauche */
     #sidebar {
       position: fixed;
-      top: 10px; 
+      top: 10px; /* Aligné sur le haut du layout */
       left: 20px;
       z-index: 10000;
       
@@ -56,6 +56,8 @@
       display: flex;
       flex-direction: column;
       align-items: left;
+      
+      /* RÉPARTITION : Pousse la caméra en haut, les options en bas, le texte au milieu */
       justify-content: space-between; 
       
       width: 100px;
@@ -79,7 +81,9 @@
       left: 200px;
       border: none;
       font-size: 22px;
-    }   
+    }
+
+   
    
     /* PANEL LATÉRAL */
     #sidePanel {
@@ -162,6 +166,7 @@
     #legend {
       width: 150px;
       padding: 10px;
+     // border-left: 1px solid #ddd;
       display: flex;
       flex-direction: column;
       //align-items: center;
@@ -195,6 +200,12 @@
         font-size: 10px;
         font-weight: 400;
     }
+    /* Texte des options */
+   /* .options-text {
+        font-size: 8px;
+        font-weight: 400;
+    }*/
+
     /* Couleurs et points */
     .legend-color,
     .legend-point {
@@ -208,7 +219,23 @@
     .legend-point {
         border-radius: 50%;
     }
-   
+   /* .legend-text {
+      font-size: 10px;
+      font-weight: 400;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #666;
+      flex-shrink: 0;
+    }
+    .legend-point {
+      width: 16px;
+      height: 16px; 
+      border-radius: 50%;
+      flex-shrink: 0;
+    }*/
     .js-plotly-plot .modebar {
       top: 40px !important;   /* décale vers le bas */
       right: 50px !important;
@@ -627,6 +654,8 @@ let entiteId = 0;
 let role = "";
 let dernierTerritoireAffiche = null;
 
+
+const couleurFond = '#c0c0c0'
 const showChoropletheValue = document.getElementById("showChoropletheValue");
 
 const showTextValue = document.getElementById("showTextValue");
@@ -931,6 +960,8 @@ async function initMetrique(metriqueId) {
       document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);   // true → ajoute la classe, false → la retire
       document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
     }
+    //console.log("metriqueRows")
+    //console.log(metriqueRows)
     syncShowMap();
   });
  
@@ -970,9 +1001,11 @@ async function init() {
       libelle: ref.libelle[i],
       tailleLibelle: ref.tailleLibelle[i],
       couleurLibelle: ref.couleurLibelle[i],
+      code_insee: ref.code_insee[i],
+      codes_insee_communes: ref.codes_insee_communes[i],
     })); 
-  console.log("territoireRows") 
-  console.log(territoireRows)
+ // console.log("territoireRows") 
+ //  console.log(territoireRows)
   territoireRows.forEach(row => {
     const option =  document.createElement("option");
     if (row.geoJson) {
@@ -984,7 +1017,6 @@ async function init() {
   applySavedValue();
   select.addEventListener('change', (event) => {
       const selectedValue = event.target.value;
-      console.log("change select")
       refreshMap(true)
       // Enregistre la valeur sous la clé 'selectedView'
       grist.setOption('selectedView', selectedValue);
@@ -1098,15 +1130,15 @@ async function init() {
 
 async function refreshMap(sidePanel) {  
   territoire = document.getElementById("territoireSelect").value;
-  console.log("territoire :" + territoire)
+  //console.log("territoire :" + territoire)
   const geoRow = territoireRows.find(r => r.territoire === territoire);
-  console.log(geoRow)
+  //console.log(geoRow)
   if (!geoRow) {
     document.getElementById("info").innerHTML = "problème à la récupération du territoire visé, faites un rafraîchissement de la page"
     Plotly.purge('chart');
     return;
   }
-  console.log(dataRecords)
+  //console.log(dataRecords)
   let recordsTerr 
   if (geoRow.estFranceAll) {
     franceAll = true ;
@@ -1154,6 +1186,44 @@ async function refreshMap(sidePanel) {
   const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
   const traces = [];        
 
+  // Couche choroplethe fond (communes sans data)
+      // 1. On trouve les codes INSEE du territoire qui N'ONT PAS de données dans records
+    const codesAvecData = new Set(records.map(r => String(r.Code_Insee)));
+    const codesTerritoireSansData = geoRow.codes_insee_communes.filter(code => {
+      if (typeof code !== 'number' && typeof code !== 'string') return false;
+      return !codesAvecData.has(String(code));
+    });
+
+    if (showChoroplethe && codesTerritoireSansData.length > 0) {
+      let fondChoropleth = {
+        type: 'choroplethmapbox',
+        geojson: cleanedGeojson,
+        locations: codesTerritoireSansData, // Uniquement les communes vides
+        featureidkey: 'properties.code_insee',
+        
+        // Pour forcer TOUT le fond en gris uniforme :
+        // On définit une échelle où le minimum (0) et le maximum (1) renvoient du gris
+        colorscale: [
+          [0, couleurFond],
+          [1, couleurFond]
+        ],
+        
+        // Le tableau 'z' DOIT faire la même taille que 'locations'
+        // On remplit tout de 0 (ou de 1) pour forcer l'utilisation de l'échelle grise
+        z: Array.from({ length: codesTerritoireSansData.length }, () => 0),
+        
+        showscale: false,
+        hoverinfo: 'skip',
+        marker: {
+          line: {
+            color: lineColor,
+            width: lineWidth / 10
+          }
+        }
+      };
+      traces.push(fondChoropleth);
+    }
+  
   // --- COUCHES CHOROPLETHE (MAPBOX) ---
   if (showChoroplethe) {
     let baseChoropleth = {
@@ -1171,6 +1241,7 @@ async function refreshMap(sidePanel) {
         }
       }
     };
+  
 
     if (metriqueType === "categorie") {
       baseChoropleth.z = records.map(r => Number(r.ValeurChoroplethe));
@@ -1208,6 +1279,7 @@ async function refreshMap(sidePanel) {
       markerSizes = records.map(r =>
       Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
     }
+
     traces.push({
       type: 'scattermapbox',
       lon:  franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
@@ -1365,9 +1437,9 @@ async function refreshMap(sidePanel) {
 
   // Enregistrement du territoire courant pour le prochain clic/refresh
   dernierTerritoireAffiche = territoire;
-  console.log("traces")
-  console.log(traces)
-  buildLegend(records);
+  //console.log("traces")
+  //console.log(traces)
+  buildLegend(records, codesTerritoireSansData.length);
   // 1. On utilise .filter() pour récupérer TOUTES les features de type LineString (renvoie un tableau)
 const featuresLignes = cleanedGeojson.features.filter(f => f.geometry.type === "LineString");
 
@@ -1430,7 +1502,7 @@ function applySavedValue() {
 
 grist.onRecords(records => {
   dataRecords = records;
-  console.log(records)
+  //console.log(records)
   init();
   refreshMap();
 });
@@ -1448,26 +1520,29 @@ grist.onOptions((options, interaction) => {
 });
 
 
-function buildLegend(records) {
-
+function buildLegend(records, unknown) {
+  console.log("unknown" + unknown)
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
   const titre = document.createElement("div");
   titre.className = "legend-titre";
   titre.innerHTML = `<span>${titreLegende}</span>`
-  legend.appendChild(titre);  
+  legend.appendChild(titre);
+
+
+  
   const colors = metriqueCouleurCat.split(',');
   const noms = metriqueNomCat.split(','); 
-
+  let liste = document.createElement("div");
+  liste.className = "legend-list";
+  legend.appendChild(liste);
   // CAS 1 : Catégorie
   if (metriqueType == "categorie") {
     
     const categories = [...new Set(
       records.map(r => Number(r.ValeurChoroplethe))
     )].sort((a,b) => a - b);
-    const liste = document.createElement("div");
-    liste.className = "legend-list";
-    legend.appendChild(liste);
+    
     categories.forEach(cat => {
       const color = colors[cat - 1];
       let label =""
@@ -1504,7 +1579,7 @@ function buildLegend(records) {
         color: colors[2]
       }
     ];
-
+   
     classes.forEach(c => {
 
       const item = document.createElement("div");
@@ -1514,12 +1589,25 @@ function buildLegend(records) {
         <div class="legend-color"
              style="background:${c.color}">
         </div>
-        <span>${c.label}</span>
+        <span class="legend-text">${c.label}</span>
       `;
 
-      legend.appendChild(item);
+      liste.appendChild(item);
     });
   }
+  if ((metriqueType === "categorie" || metriqueType === "seuils") && unknown > 2 ) { // >2 car [ "L", 973 ] quand on a tout L + code du territoire lui-même
+      const item = document.createElement("div");
+      item.className = "legend-item";
+
+      item.innerHTML = `
+        <div class="legend-color"
+             style="background:${couleurFond}">
+        </div>
+        <span class="legend-text">Absence de données</span>
+      `;
+
+      liste.appendChild(item);
+    }
   if (showPoints) {
     const item = document.createElement("div");
       item.className = "legend-item";
