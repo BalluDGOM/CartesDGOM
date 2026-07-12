@@ -565,6 +565,9 @@ grist.ready({
   requiredAccess: 'full',
   requiredColumns: [
     { name: "Metrique", type: "Any", title: "Métrique" },
+    { name: "indId1", type: "Int", title: "IndicateurId1" },
+    { name: "indId2", type: "Int", title: "IndicateurId2" },
+    { name: "indId3", type: "Int", title: "IndicateurId3" },
     { name: "TitreLegende", type: "Any", title: "Titre de la légende" },
     { name: "EPCIestLaLegende", type: "Bool", title: "EPCIestLaLegende" },
     { name: "AfficherChoroplethe", type: "Bool", title: "Afficher Choroplèthe" },
@@ -590,7 +593,6 @@ grist.ready({
     { name: "TaillePointCommunes", type: "Numeric", title: "Taille Point Communes" },
     { name: "CouleurPointCommunes", type: "Any", title: "Couleur Point Communes" },
     { name: "AfficherPointCommuneALaMairie", type: "Bool", title: "Afficher Point Commune à la Mairie" },
-    { name: "PopPourPtCommunes", type: "Any", title: "Pop Pour Pt Communes" },
     
     { name: "TaillePointMairies", type: "Numeric", title: "Taille Point Mairies" },
     { name: "CouleurPointMairies", type: "Any", title: "Couleur Point Mairies" },
@@ -599,7 +601,6 @@ grist.ready({
     { name: "CouleurTexteEPCI", type: "Any", title: "Couleur Texte EPCI" },
     { name: "TaillePointEPCI", type: "Numeric", title: "Taille Point EPCI" },
     { name: "CouleurPointEPCI", type: "Any", title: "Couleur Point EPCI" },
-    { name: "PopPourPtEPCI", type: "Any", title: "Pop Pour Pt EPCI" },
     
     { name: "CouleurLigne", type: "Any", title: "Couleur Ligne" },
     { name: "EpaisseurLigne", type: "Numeric", title: "Epaisseur Ligne" },
@@ -618,8 +619,11 @@ let dataRecords = [];
 let territoireRows = [];
 let select = document.getElementById("territoireSelect");
 let pendingSelectedValue = null;
-let currentMetriqueId;
+let metrique;
 let metriqueNom;
+let indId1;
+let indId2;
+let indId3;
 let titreLegende;
 let EPCIestLaLegende;
 let showChoroplethe;
@@ -804,169 +808,106 @@ async function loadGeoJson(geoJsonCell) {
       }
 }
 
-async function initMetrique(metriqueId) {
-  
-  const ref =  await grist.docApi.fetchTable("Metriques");
-  currentMetriqueId = metriqueId;
+async function initMetrique() {
+  metriqueNom = metrique.Nom ;
+  titreLegende = metrique.TitreLegende
+  EPCIestLaLegende = metrique.EPCIestLaLegende;
+  showChoroplethe = metrique.AfficherChoroplethe ;
 
-  metriqueRows =
-    ref.id.map((_, i) => ({
-      id: ref.id[i],
-      nom: ref.Metrique[i],
-      titreLegende: ref.TitreLegende[i],
-      EPCIestLaLegende: ref.EPCIestLaLegende[i],
-      afficherChoroplethe: ref.AfficherChoroplethe[i],
+  showText = metrique.AfficherNomCommunes ;
+  showTextMairies = metrique.AfficherNomMairies ;
+  showTextEPCI = metrique.AfficherNomEPCI ;
 
-      afficherNomCommunes: ref.AfficherNomCommunes[i],
-      afficherNomMairies: ref.AfficherNomMairies[i],
-      afficherNomEPCI: ref.AfficherNomEPCI[i],
+  showPoints = metrique.AfficherPointsCommunes ;
+  textPointsUnit = metrique.DimensionPointsCommunes ;
+  showPointsAtMairies = metrique.AfficherPointsAtMairies;
 
-      afficherPointsCommunes: ref.AfficherPointsCommunes[i],
-      dimensionPointsCommunes: ref.DimensionPointsCommunes[i],
-      afficherPointsMairies: ref.AfficherPointsMairies[i],
-      afficherPointsEPCI: ref.AfficherPointsEPCI[i],
-      dimensionPointsEPCI: ref.DimensionPointsEPCI[i],
+  showPointsMairies = metrique.AfficherPointsMairies ;  
 
-      type: ref.Type[i],
-      seuil1: ref.Seuil1[i],
-      seuil2: ref.Seuil2[i],
-      couleurCat: ref.CouleurCategories[i],
-      nomCat: ref.NomCategories[i],
+  showPointsEPCI = metrique.AfficherPointsEPCI ;
+  textPointsUnitEPCI = metrique.DimensionPointsEPCI ; 
 
-      textSize: ref.TailleTexteCommunes[i],
-      textColor: ref.CouleurTexteCommunes[i],
-      pointSize: ref.TaillePointCommunes[i],
-      pointColor: ref.CouleurPointCommunes[i],
-      afficherPointsAtMairies: ref.AfficherPointCommuneALaMairie[i],
-      popPourPtCommunes: ref.PopPourPtCommunes[i],
+  showGeo = metrique.AfficherGeographie ;
+  metriqueType = metrique.Type ;
+  metriqueSeuil1 = metrique.Seuil1 ;
+  metriqueSeuil2 = metrique.Seuil2 ;
+  metriqueCouleurCat = metrique.CouleurCategories ;
+  metriqueNomCat = metrique.NomCategories ;
+
+  textSize = metrique.TailleTexteCommunes ?? 12;
+  textColor = metrique.CouleurTexteCommunes ?? "#000000";
+  pointSize = metrique.TaillePointCommunes ?? 1;
+  pointColor = metrique.CouleurPointCommunes ?? "#000000";
+
+  pointSizeMairies = metrique.TaillePointMairies ?? 1;
+  pointColorMairies = metrique.CouleurPointMairies ?? "#000000";
+
+  textSizeEPCI = metrique.TailleTexteEPCI ?? 12;
+  textColorEPCI = metrique.CouleurTexteEPCI ?? "#000000";
+  pointSizeEPCI = metrique.TaillePointEPCI ?? 1;
+  pointColorEPCI = metrique.CouleurPointEPCI ?? "#000000";
+
+  lineColor = metrique.CouleurLigne ?? "#000000";
+  lineWidth = metrique.EpaisseurLigne ?? 1;
+  showMap = metrique.MontrerLeFond ?? false;
+  DGOMMap = metrique.CarteDGOM ?? false;
+  entiteMetrique = metrique.Entite;
       
-      pointSizeMairies: ref.TaillePointMairies[i],
-      pointColorMairies: ref.CouleurPointMairies[i],
+  showChoropletheValue.checked = showChoroplethe;
+  showTextValue.checked = showText;
+  showTextValueMairies.checked = showTextMairies;
+  showPointValueMairies.checked = showPointsAtMairies;
+  showTextValueEPCI.checked = showTextEPCI;
 
-      textSizeEPCI: ref.TailleTexteEPCI[i],
-      textColorEPCI: ref.CouleurTexteEPCI[i],
-      pointSizeEPCI: ref.TaillePointEPCI[i],
-      pointColorEPCI: ref.CouleurPointEPCI[i],
-      popPourPtEPCI: ref.PopPourPtEPCI[i],
-
-      lineColor: ref.CouleurLigne[i],
-      lineWidth: ref.EpaisseurLigne[i],
-      showMap: ref.MontrerLeFond[i],
-      DGOMMap: ref.CarteDGOM[i],
-      entite: ref.Entite[i],
-      showGeo: ref.AfficherGeographie[i]
-    }));
-  metriqueRows.forEach(row => {
-    if (row.id == metriqueId) {
-      metriqueNom = row.nom ;
-      titreLegende = row.titreLegende
-      EPCIestLaLegende = row.EPCIestLaLegende;
-      showChoroplethe = row.afficherChoroplethe ;
-
-      showText = row.afficherNomCommunes ;
-      showTextMairies = row.afficherNomMairies ;
-      showTextEPCI = row.afficherNomEPCI ;
-
-      showPoints = row.afficherPointsCommunes ;
-      textPointsUnit = row.dimensionPointsCommunes ;
-      showPointsAtMairies = row.afficherPointsAtMairies;
-      popPourPtCommunes = row.popPourPtCommunes ;
-
-      showPointsMairies = row.afficherPointsMairies ;  
-
-      showPointsEPCI = row.afficherPointsEPCI ;
-      textPointsUnitEPCI = row.dimensionPointsEPCI ; 
-      popPourPtEPCI = row.popPourPtEPCI ;
-
-      showGeo = row.showGeo ;
-      metriqueType = row.type ;
-      metriqueSeuil1 = row.seuil1 ;
-      metriqueSeuil2 = row.seuil2 ;
-      metriqueCouleurCat = row.couleurCat ;
-      metriqueNomCat = row.nomCat ;
-
-      textSize = row.fontSize ?? 12;
-      textColor = row.textColor ?? "#000000";
-      pointSize = row.pointSize ?? 1;
-      pointColor = row.pointColor ?? "#000000";
-
-      textSizeMairies = row.fontSizeValueMairie ?? 12;
-      textColorMairies = row.textColorMairies ?? "#000000";
-      pointSizeMairies = row.pointSizeMairies ?? 1;
-      pointColorMairies = row.pointColorMairies ?? "#000000";
-
-      textSizeEPCI = row.fontSizeEPCI ?? 12;
-      textColorEPCI = row.textColorEPCI ?? "#000000";
-      pointSizeEPCI = row.pointSizeEPCI ?? 1;
-      pointColorEPCI = row.pointColorEPCI ?? "#000000";
-
-      lineColor = row.lineColor ?? "#000000";
-      lineWidth = row.lineWidth ?? 1;
-      showMap = row.showMap ?? false;
-      DGOMMap = row.DGOMMap ?? false;
-      entiteMetrique = row.entite;
-      //initialisation des valeurs du sidePanel
+  showPointsValue.checked = showPoints;
+  showPointsValueMairies.checked = showPointsMairies;
+  showPointsValueEPCI.checked = showPointsEPCI;
       
-      showChoropletheValue.checked = showChoroplethe;
-      showTextValue.checked = showText;
-      showTextValueMairies.checked = showTextMairies;
-      showPointValueMairies.checked = showPointsAtMairies;
-      showTextValueEPCI.checked = showTextEPCI;
+  fontSizeSlider.value = textSize;
+  fontSizeValue.textContent = textSize;
 
-      showPointsValue.checked = showPoints;
-      showPointsValueMairies.checked = showPointsMairies;
-      showPointsValueEPCI.checked = showPointsEPCI;
+  fontSizeSliderEPCI.value = textSizeEPCI;
+  fontSizeValueEPCI.textContent = textSizeEPCI;
       
-      fontSizeSlider.value = textSize;
-      fontSizeValue.textContent = textSize;
+  textColorPicker.value = textColor;
+  textColorPickerEPCI.value = textColorEPCI;
 
-      fontSizeSliderEPCI.value = textSizeEPCI;
-      fontSizeValueEPCI.textContent = textSizeEPCI;
+  pointColorPicker.value = pointColor;
+  pointSizeSlider.value = pointSize;
+  pointSizeValue.textContent = pointSize;
+
+  pointColorPickerMairies.value = pointColorMairies;
+  pointSizeSliderMairies.value = pointSizeMairies;
+  pointSizeValueMairies.textContent = pointSizeMairies;
+
+  pointColorPickerEPCI.value = pointColorEPCI;
+  pointSizeSliderEPCI.value = pointSizeEPCI;
+  pointSizeValueEPCI.textContent = pointSizeEPCI;
+
+  lineColorPicker.value = lineColor;
+  lineWidthSlider.value = lineWidth;
+  showGeoValue.checked = showGeo;
+  showMapSwitch.checked = showMap;
+  DGOMMapSwitch.checked = DGOMMap;
+
+  const saveMetricBtn = document.getElementById("saveMetricBtn");
+
+  if (entiteId === metrique.entite || role === "Admin") {
+    saveMetricBtn.style.display = "block"; // ou "" selon ton CSS
+    document.getElementById("notOwner").style.display = "none";          
+  } else {
+    saveMetricBtn.style.display = "none";
+    document.getElementById("notOwner").style.display = "block";
+  }
       
-      textColorPicker.value = textColor;
-      textColorPickerEPCI.value = textColorEPCI;
+  document.getElementById("showChoropletheDetails").classList.toggle('hidden', !showChoroplethe);  
+  document.getElementById("showCommuneTextDetails").classList.toggle('hidden', !showText);  
+  document.getElementById("showEPCITextDetails").classList.toggle('hidden', !showTextEPCI);  
+  document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);  
+  document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);  
+  document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);
 
-      pointColorPicker.value = pointColor;
-      pointSizeSlider.value = pointSize;
-      pointSizeValue.textContent = pointSize;
-
-      pointColorPickerMairies.value = pointColorMairies;
-      pointSizeSliderMairies.value = pointSizeMairies;
-      pointSizeValueMairies.textContent = pointSizeMairies;
-
-      pointColorPickerEPCI.value = pointColorEPCI;
-      pointSizeSliderEPCI.value = pointSizeEPCI;
-      pointSizeValueEPCI.textContent = pointSizeEPCI;
-     
-
-      lineColorPicker.value = lineColor;
-      lineWidthSlider.value = lineWidth;
-      showGeoValue.checked = showGeo;
-      showMapSwitch.checked = showMap;
-      DGOMMapSwitch.checked = DGOMMap;
-      const saveMetricBtn = document.getElementById("saveMetricBtn");
-
-      if (entiteId === entiteMetrique || role === "Admin") {
-          saveMetricBtn.style.display = "block"; // ou "" selon ton CSS
-          document.getElementById("notOwner").style.display = "none";          
-      } else {
-          saveMetricBtn.style.display = "none";
-          document.getElementById("notOwner").style.display = "block";
-      }
-      document.getElementById("showChoropletheDetails").classList.toggle('hidden', !showChoroplethe);   // true → ajoute la classe, false → la retire
-      document.getElementById("showCommuneTextDetails").classList.toggle('hidden', !showText);   // true → ajoute la classe, false → la retire
-      document.getElementById("showEPCITextDetails").classList.toggle('hidden', !showTextEPCI);   // true → ajoute la classe, false → la retire
-      document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);   // true → ajoute la classe, false → la retire
-      document.getElementById("showMairiePointDetails").classList.toggle('hidden', !showPointsMairies);   // true → ajoute la classe, false → la retire
-      document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
-    }
-    //console.log("metriqueRows")
-    //console.log(metriqueRows)
-    syncShowMap();
-  });
- 
-    
-  
+  syncShowMap();   
 }
 
 async function init() {
@@ -981,15 +922,12 @@ async function init() {
   territoireRows =
     ref.id.map((_, i) => ({
       territoire: ref.Nom[i],
+      territoireId: ref.id[i],
       geoJson: ref.GeoJson[i],
       geoJsonDGOM: ref.GeoJsonDGOM[i],
       geoJsonDGOM2: ref.GeoJsonDGOM2[i],
       estFranceAll: ref.estFranceAll[i],
       dansFranceAll: ref.dansFranceAll[i],
-      limiteN: ref.LimiteN[i],
-      limiteS: ref.LimiteS[i],
-      limiteE: ref.LimiteE[i],
-      limiteO: ref.LimiteO[i],
       latCentreCarte: ref.LatCentreCarte[i],
       longCentreCarte: ref.LongCentreCarte[i],
       zoomCarte: ref.ZoomCarte[i],
@@ -1004,8 +942,7 @@ async function init() {
       code_insee: ref.code_insee[i],
       codes_insee_communes: ref.codes_insee_communes[i],
     })); 
- // console.log("territoireRows") 
- //  console.log(territoireRows)
+  //console.log("territoireRows",territoireRows)
   territoireRows.forEach(row => {
     const option =  document.createElement("option");
     if (row.geoJson) {
@@ -1138,22 +1075,25 @@ async function refreshMap(sidePanel) {
     Plotly.purge('chart');
     return;
   }
-  //console.log(dataRecords)
+  //console.log("Refreshmap : ", dataRecords)
   let recordsTerr 
   if (geoRow.estFranceAll) {
     franceAll = true ;
     recordsTerr = dataRecords
   } else {
-    recordsTerr = dataRecords.filter(r => r.territoire === territoire);
+    recordsTerr = dataRecords.filter(r => r.territoire === geoRow.territoireId);
   }
+  //console.log("TERRITOIRE : ", geoRow.territoireId)
+  //console.log("recordsTerr : ", recordsTerr)
   if (recordsTerr.length == 0) {
     document.getElementById("info").innerHTML = "Pas de données à afficher : il faut qu'il y ait des données pour le couple territoire/métrique";
     Plotly.purge('chart');
     return
   }
-  const metriqueId = recordsTerr[0].MetriqueId;
+
+
   if (!sidePanel) {
-    await initMetrique(metriqueId);
+    await initMetrique();
   }
   document.getElementById("info").innerHTML = "";
   document.getElementById("titre").innerHTML =  territoire + " - " + metriqueNom;
@@ -1166,7 +1106,7 @@ async function refreshMap(sidePanel) {
   const geoJsonDGOMSafe = geoRow.geoJsonDGOM ? geoRow.geoJsonDGOM : geoRow.geoJson
   let geoJsonCell
   if (franceAll) { //France entière => carte DGOM
-    geoJsonCell = geoRow.geoJsonDGOM2
+    geoJsonCell = geoRow.geoJsonDGOM
     DGOMMapSwitch.checked = true;
     DGOMMap = true ;
     syncShowMap();
@@ -1181,20 +1121,40 @@ async function refreshMap(sidePanel) {
     cleanedGeojson = fixGeoJSON(geojson);
     validateGeoJSON(cleanedGeojson)
   } 
-  const records = recordsTerr.filter(r => r.MetriqueId === metriqueId);
-  const colorsSet = [...new Set(records.map(r => Number(r.ValeurChoroplethe)))].sort((a, b) => a - b);
+  let records1 = null
+  let records2 = null
+  let records3 = null
+  if (metrique.IndId1) {
+    records1 = recordsTerr.filter(r => Number(r.Indicateur) === Number(metrique.IndId1))
+  } 
+  if (metrique.IndId2) {
+    records2 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId2)) && (r.porteeValeur === 'Commune'))  } 
+  if (metrique.IndId3) {
+    records3 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId3)) && (r.porteeValeur === 'EPCI'))
+  } 
+/*
+  console.log("records1 : " + metrique.IndId1)
+  console.log("records1", records1)
+  console.log("records2 : " + metrique.IndId2)
+  console.log("records2", records2)
+  console.log("records3 : " + metrique.IndId3)
+  console.log("records3", records3)*/
+  const colorsSet = [...new Set(records1.map(r => Number(r.Valeur)))].sort((a, b) => a - b);
   const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
-  const traces = [];        
+  const traces = [];     
+  //console.log("colorscale", colorscale)   
+  //console.log("metriqueCouleurCat", metriqueCouleurCat)   
 
   // Couche choroplethe fond (communes sans data)
       // 1. On trouve les codes INSEE du territoire qui N'ONT PAS de données dans records
-    const codesAvecData = new Set(records.map(r => String(r.Code_Insee)));
+    const codesAvecData = new Set(records1.map(r => String(r.Code_Insee)));
+    //console.log("codesAvecData " , codesAvecData)
     const codesTerritoireSansData = geoRow.codes_insee_communes.filter(code => {
       if (typeof code !== 'number' && typeof code !== 'string') return false;
       return !codesAvecData.has(String(code));
     });
 
-    if (showChoroplethe && codesTerritoireSansData.length > 0) {
+    if (showChoroplethe && codesTerritoireSansData.length > 2) {
       let fondChoropleth = {
         type: 'choroplethmapbox',
         geojson: cleanedGeojson,
@@ -1207,9 +1167,6 @@ async function refreshMap(sidePanel) {
           [0, couleurFond],
           [1, couleurFond]
         ],
-        
-        // Le tableau 'z' DOIT faire la même taille que 'locations'
-        // On remplit tout de 0 (ou de 1) pour forcer l'utilisation de l'échelle grise
         z: Array.from({ length: codesTerritoireSansData.length }, () => 0),
         
         showscale: false,
@@ -1229,7 +1186,7 @@ async function refreshMap(sidePanel) {
     let baseChoropleth = {
     type: 'choroplethmapbox', // Changement ici
     geojson: cleanedGeojson,
-    locations: records.map(r => String(r.Code_Insee)),
+    locations: records1.map(r => String(r.Code_Insee)),
     featureidkey: 'properties.code_insee',
     colorscale: colorscale,
     showscale: false,
@@ -1243,20 +1200,20 @@ async function refreshMap(sidePanel) {
     };
   
 
-    if (metriqueType === "categorie") {
-      baseChoropleth.z = records.map(r => Number(r.ValeurChoroplethe));
+    if (metriqueType === "Categorie") {
+      baseChoropleth.z = records1.map(r => Number(r.Valeur));
       traces.push(baseChoropleth);
-    } else if (metriqueType === "seuils") {
-      baseChoropleth.z = records.map(r => {
-        const v = Number(r.ValeurChoroplethe);
+    } else if (metriqueType === "Seuils") {
+      baseChoropleth.z = records1.map(r => {
+        const v = Number(r.Valeur);
         if (v < metriqueSeuil1) return 1;
         if (v <= metriqueSeuil2) return 2;
         return 3;
       });
       traces.push(baseChoropleth);
     } else {
-      baseChoropleth.z = records.map(r => {
-        const v = Number(r.ValeurChoroplethe);
+      baseChoropleth.z = records1.map(r => {
+        const v = Number(r.Valeur);
         return v;
       });
       baseChoropleth.colorscale = metriqueType;
@@ -1267,23 +1224,17 @@ async function refreshMap(sidePanel) {
   
 
   // --- COUCHE POINTS COMMUNES (MAPBOX) ---
-  if (showPoints) {
+  if (showPoints && records2) {
     let maxValue;
     let markerSizes;
-    if (popPourPtCommunes) {
-      maxValue = Math.max(...records.map(r => Number(r.ValeurPop)));
-      markerSizes = records.map(r =>
-      Math.sqrt(Number(r.ValeurPop) / maxValue) * 40 * pointSize / 3 );
-    } else {
-      maxValue = Math.max(...records.map(r => Number(r.ValeurPointCommune)));
-      markerSizes = records.map(r =>
-      Math.sqrt(Number(r.ValeurPointCommune) / maxValue) * 40 * pointSize / 3 );
-    }
-
+    maxValue = Math.max(...records2.map(r => Number(r.Valeur)));
+    markerSizes = records2.map(r =>
+    Math.sqrt(Number(r.Valeur) / maxValue) * 40 * pointSize / 3 );
+    
     traces.push({
       type: 'scattermapbox',
-      lon:  franceAll ? records.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)) ) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long)) ),
-      lat: franceAll ? records.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)) ) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat)) ),
+      lon:  franceAll ? records2.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records2.map(r => Number(r.longMairieDGOM)) : records2.map(r => Number(r.longMairie)) ) : (DGOMMap ? records2.map(r => Number(r.longDGOM)) : records2.map(r => Number(r.long)) ),
+      lat: franceAll ? records2.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records2.map(r => Number(r.latMairieDGOM)) : records2.map(r => Number(r.latMairie)) ) : (DGOMMap ? records2.map(r => Number(r.latDGOM)) : records2.map(r => Number(r.lat)) ),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1292,7 +1243,7 @@ async function refreshMap(sidePanel) {
         opacity: 0.7,
         line: { width: 1, color: 'white' } 
       },
-      text: popPourPtCommunes ? records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPop)}`) : records.map(r => `${r.Nom}<br>${textPointsUnit} : ${fmt.format(r.ValeurPointCommune)}`),
+      text: records2.map(r => `${r.NomCommune}<br>${textPointsUnit} : ${fmt.format(r.Valeur)}`),
       hovertemplate: '%{text}<extra></extra>'
     });
   }
@@ -1301,8 +1252,8 @@ async function refreshMap(sidePanel) {
   if (showPointsMairies) {    
     traces.push({
       type: 'scattermapbox', 
-      lon: DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie)),
-      lat: DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie)),
+      lon: DGOMMap ? recordsTerr.map(r => Number(r.longMairieDGOM)) : recordsTerr.map(r => Number(r.longMairie)),
+      lat: DGOMMap ? recordsTerr.map(r => Number(r.latMairieDGOM)) : recordsTerr.map(r => Number(r.latMairie)),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1316,26 +1267,20 @@ async function refreshMap(sidePanel) {
   }
 
   // --- COUCHE POINTS EPCI (MAPBOX) ---
-  if (showPointsEPCI) {
+  if (showPointsEPCI && records3) {
     let maxValueEPCI;
     let markerSizesEPCI;
     const uniqueRecords = [
-      ...new Map(records.map(r => [`${r.latEPCI}|${r.longEPCI}`, r])).values()
+      ...new Map(records3.map(r => [`${r.lat}|${r.long}`, r])).values()
     ];
-    if (popPourPtEPCI) {
-      maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPopEPCI)));
-      markerSizesEPCI  = uniqueRecords.map(r =>
-      Math.sqrt(Number(r.ValeurPopEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
-    } else {
-      maxValueEPCI = Math.max(...records.map(r => Number(r.ValeurPointEPCI)));
-      markerSizesEPCI  = uniqueRecords.map(r =>
-      Math.sqrt(Number(r.ValeurPointEPCI) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
-    }
-
+    maxValueEPCI = Math.max(...records3.map(r => Number(r.Valeur)));
+    markerSizesEPCI  = uniqueRecords.map(r =>
+    Math.sqrt(Number(r.Valeur) / maxValueEPCI) * 40 * pointSizeEPCI / 3 );
+    
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: franceAll ? uniqueRecords.map(r => Number(r.longEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
-      lat: franceAll ? uniqueRecords.map(r => Number(r.latEPCIDGOM2)) : DGOMMap ?  uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      lon: franceAll ? uniqueRecords.map(r => Number(r.longDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longDGOM)) : uniqueRecords.map(r => Number(r.long)),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latDGOM2)) : DGOMMap ?  uniqueRecords.map(r => Number(r.latDGOM)) : uniqueRecords.map(r => Number(r.lat)),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1344,7 +1289,7 @@ async function refreshMap(sidePanel) {
         opacity: 0.7
       },
       // Correction ici : uniqueRecords au lieu de records pour éviter le décalage de taille/texte
-      text: popPourPtEPCI ? uniqueRecords.map(r => `${r.NomEPCI}<br>${textPointsUnitEPCI} : ${fmt.format(r.ValeurPopEPCI)}`) : uniqueRecords.map(r => `${r.Nom}<br>${textPointsUnitEPCI} : ${fmt.format(r.ValeurPointEPCI)}`),
+      text: uniqueRecords.map(r => `${r.NomEPCI}<br>${textPointsUnitEPCI} : ${fmt.format(r.Valeur)}`),
       hovertemplate: '%{text}<extra></extra>'
     });
   }
@@ -1353,10 +1298,10 @@ async function refreshMap(sidePanel) {
   if (showText) {    
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: franceAll ? records.map(r => Number(r.longDGOM2)) : showTextMairies ? (DGOMMap ? records.map(r => Number(r.longMairieDGOM)) : records.map(r => Number(r.longMairie))) : (DGOMMap ? records.map(r => Number(r.longDGOM)) : records.map(r => Number(r.long))),
-      lat: franceAll ? records.map(r => Number(r.latDGOM2)) : showTextMairies ? (DGOMMap ? records.map(r => Number(r.latMairieDGOM)) : records.map(r => Number(r.latMairie))) : (DGOMMap ? records.map(r => Number(r.latDGOM)) : records.map(r => Number(r.lat))),
+      lon: franceAll ? recordsTerr.map(r => Number(r.longDGOM2)) : showTextMairies ? (DGOMMap ? recordsTerr.map(r => Number(r.longMairieDGOM)) : recordsTerr.map(r => Number(r.longMairie))) : (DGOMMap ? recordsTerr.map(r => Number(r.longDGOM)) : recordsTerr.map(r => Number(r.long))),
+      lat: franceAll ? recordsTerr.map(r => Number(r.latDGOM2)) : showTextMairies ? (DGOMMap ? recordsTerr.map(r => Number(r.latMairieDGOM)) : recordsTerr.map(r => Number(r.latMairie))) : (DGOMMap ? recordsTerr.map(r => Number(r.latDGOM)) : recordsTerr.map(r => Number(r.lat))),
       mode: 'text',
-      text: records.map(r => r.Nom),
+      text: recordsTerr.map(r => r.NomCommune),
       showlegend: false, 
       textfont: {
         size: textSize,
@@ -1370,11 +1315,11 @@ async function refreshMap(sidePanel) {
     let uniqueRecords = [] 
     if (DGOMMap) {
         uniqueRecords = [
-        ...new Map(records.map(r => [`${r.latGeoDGOM}|${r.longGeoDGOM}`, r])).values()
+        ...new Map(recordsTerr.map(r => [`${r.latGeoDGOM}|${r.longGeoDGOM}`, r])).values()
       ];
     } else {
       uniqueRecords = [
-        ...new Map(records.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
+        ...new Map(recordsTerr.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
       ];
     }
     traces.push({
@@ -1394,7 +1339,7 @@ async function refreshMap(sidePanel) {
   // --- COUCHE TEXTE EPCI (MAPBOX) ---
   if (showTextEPCI) {
     const seen = new Set();
-    const uniqueRecords = records.filter(r => {
+    const uniqueRecords = recordsTerr.filter(r => {
       if (seen.has(r.NomEPCI)) return false; // Correction : NomEPCI pour filtrer les doublons d'EPCI, pas Nom de commune
       seen.add(r.NomEPCI);
       return true;
@@ -1437,9 +1382,8 @@ async function refreshMap(sidePanel) {
 
   // Enregistrement du territoire courant pour le prochain clic/refresh
   dernierTerritoireAffiche = territoire;
-  //console.log("traces")
-  //console.log(traces)
-  buildLegend(records, codesTerritoireSansData.length);
+  console.log("traces", traces)
+  buildLegend(records1, codesTerritoireSansData.length);
   // 1. On utilise .filter() pour récupérer TOUTES les features de type LineString (renvoie un tableau)
 const featuresLignes = cleanedGeojson.features.filter(f => f.geometry.type === "LineString");
 
@@ -1497,14 +1441,47 @@ function applySavedValue() {
   // déclenche le refresh pour être sûr
   refreshMap();
 }
+grist.onRecord(async (record) => {
+  // Sécurité : si aucun enregistrement n'est sélectionné
+  if (!record) return;
+  metrique = record
+  try {
+    // On récupère toute la table "données"
+    const donneesTable = await grist.docApi.fetchTable('Donnees');
 
+    // Reconstruit les lignes sous forme de tableau d'objets
+    const nbRows = donneesTable.id.length;
+    const rows = [];
+    for (let i = 0; i < nbRows; i++) {
+      const row = {};
+      for (const col of Object.keys(donneesTable)) {
+        row[col] = donneesTable[col][i];
+      }
+      rows.push(row);
+    }
 
+    // Filtre : ne garde que les données dont la liste de métriques contient l'id sélectionné
+    dataRecords = rows.filter(r => {
+      const metriquesCol = r.Metriques; // nom de votre colonne Reference List
+      const ids = Array.isArray(metriquesCol) ? metriquesCol.filter(v => typeof v === 'number') : [];
+      return ids.includes(metrique.id);
+    });
 
-grist.onRecords(records => {
-  dataRecords = records;
-  //console.log(records)
-  init();
-  refreshMap();
+    // ==========================================
+    // LANCEMENT DES FONCTIONS APRÈS RÉCUPÉRATION
+    // ==========================================
+    // On utilise 'await' au cas où init() ou refreshMap() font des opérations asynchrones (ex: charger Leaflet, appeler une API...)
+    if (typeof init === "function") {
+      await init(); 
+    }
+    
+    if (typeof refreshMap === "function") {
+      await refreshMap();
+    }
+
+  } catch (err) {
+    console.error("Erreur lors du traitement des données Grist :", err);
+  }
 });
 
 grist.onOptions((options, interaction) => {
@@ -1521,33 +1498,33 @@ grist.onOptions((options, interaction) => {
 
 
 function buildLegend(records, unknown) {
-  console.log("unknown" + unknown)
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
   const titre = document.createElement("div");
   titre.className = "legend-titre";
   titre.innerHTML = `<span>${titreLegende}</span>`
   legend.appendChild(titre);
-
-
   
   const colors = metriqueCouleurCat.split(',');
   const noms = metriqueNomCat.split(','); 
+  
   let liste = document.createElement("div");
   liste.className = "legend-list";
   legend.appendChild(liste);
   // CAS 1 : Catégorie
-  if (metriqueType == "categorie") {
-    
+  if (metriqueType == "Categorie") {
+      
     const categories = [...new Set(
-      records.map(r => Number(r.ValeurChoroplethe))
+      records.map(r => Number(r.Valeur))
     )].sort((a,b) => a - b);
+
+    //console.log("categories", categories)
     
     categories.forEach(cat => {
       const color = colors[cat - 1];
       let label =""
       if (EPCIestLaLegende) {
-        label = records.find(r => Number(r.ValeurChoroplethe) == cat )?.NomEPCI || cat;
+        label = records.find(r => Number(r.Valeur) == cat )?.NomEPCI || cat;
       } else {
         label = noms[cat-1];
       }
@@ -1563,7 +1540,7 @@ function buildLegend(records, unknown) {
     });
   }
 
-  if (metriqueType === "seuils") {
+  if (metriqueType === "Seuils") {
     const colors = metriqueCouleurCat.split(",");
     const classes = [
       {
@@ -1595,7 +1572,7 @@ function buildLegend(records, unknown) {
       liste.appendChild(item);
     });
   }
-  if ((metriqueType === "categorie" || metriqueType === "seuils") && unknown > 2 ) { // >2 car [ "L", 973 ] quand on a tout L + code du territoire lui-même
+  if ((metriqueType === "Categorie" || metriqueType === "Seuils") && unknown > 2 ) { // >2 car [ "L", 973 ] quand on a tout L + code du territoire lui-même
       const item = document.createElement("div");
       item.className = "legend-item";
 
@@ -1635,8 +1612,8 @@ function buildLegend(records, unknown) {
 function buildColorscale(liste) { 
   const colors = metriqueCouleurCat.split(',');  
   const scale = []; 
-
-  if (metriqueType === "seuils") { 
+  //console.log('metriqueType',metriqueType)
+  if (metriqueType === "Seuils") { 
     const n=3
     for (let i = 0; i < n; i++) {
       const start = i / n;
@@ -1645,7 +1622,7 @@ function buildColorscale(liste) {
       scale.push([end, colors[i]]);
     }
   }
-  if (metriqueType === "categorie") {
+  if (metriqueType === "Categorie") {
     const n = liste.length; 
     for (let i = 0; i < n; i++) {
       const start = i / n;
@@ -1654,6 +1631,7 @@ function buildColorscale(liste) {
       scale.push([start, colors[i]]);
       scale.push([end, colors[i]]);
     }
+    
   }
   return scale; 
 }
@@ -1669,7 +1647,7 @@ function downloadImage(dataUrl, filename) {
 
 async function saveMetricOptions() {
 
-  if (!currentMetriqueId) {
+  if (!metrique.id) {
     alert("Aucune métrique sélectionnée");
     return;
   }
@@ -1679,7 +1657,7 @@ async function saveMetricOptions() {
     const table = grist.getTable("Metriques");
 
     await table.update({
-      id: currentMetriqueId,
+      id: metrique.id,
       fields: {
         AfficherChoroplethe: showChoroplethe,
         AfficherNomCommunes: showText,
