@@ -658,7 +658,6 @@ let entiteId = 0;
 let role = "";
 let dernierTerritoireAffiche = null;
 
-
 const couleurFond = '#c0c0c0'
 const showChoropletheValue = document.getElementById("showChoropletheValue");
 
@@ -1082,8 +1081,8 @@ async function refreshMap(sidePanel) {
   } else {
     recordsTerr = dataRecords.filter(r => r.territoire === geoRow.territoireId);
   }
-  //console.log("TERRITOIRE : ", geoRow.territoireId)
-  //console.log("recordsTerr : ", recordsTerr)
+  console.log("TERRITOIRE : ", geoRow.territoireId)
+  console.log("recordsTerr : ", recordsTerr)
   if (recordsTerr.length == 0) {
     document.getElementById("info").innerHTML = "Pas de données à afficher : il faut qu'il y ait des données pour le couple territoire/métrique";
     Plotly.purge('chart');
@@ -1131,18 +1130,19 @@ async function refreshMap(sidePanel) {
   if (metrique.IndId3) {
     records3 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId3)) && (r.porteeValeur === 'EPCI'))
   } 
-/*
+
   console.log("records1 : " + metrique.IndId1)
   console.log("records1", records1)
   console.log("records2 : " + metrique.IndId2)
   console.log("records2", records2)
   console.log("records3 : " + metrique.IndId3)
-  console.log("records3", records3)*/
-  const colorsSet = [...new Set(records1.map(r => Number(r.Valeur)))].sort((a, b) => a - b);
-  const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
+  console.log("records3", records3)
+  //const colorsSet = [...new Set(records1.map(r => Number(r.Valeur)))].sort((a, b) => a - b); // a priri inutile vu qu'on fixe dorénavant le nombre de catégories
+  //const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
+  const colorscale = metriqueCouleurCat ? buildColorscale(metriqueCouleurCat.split(',').length) : metriqueType; 
   const traces = [];     
-  //console.log("colorscale", colorscale)   
-  //console.log("metriqueCouleurCat", metriqueCouleurCat)   
+  console.log("colorscale", colorscale)   
+  console.log("metriqueCouleurCat", metriqueCouleurCat)   
 
   // Couche choroplethe fond (communes sans data)
       // 1. On trouve les codes INSEE du territoire qui N'ONT PAS de données dans records
@@ -1188,6 +1188,8 @@ async function refreshMap(sidePanel) {
     locations: records1.map(r => String(r.Code_Insee)),
     featureidkey: 'properties.code_insee',
     colorscale: colorscale,
+    zmin: 1,  
+    zmax: metriqueCouleurCat.split(',').length,
     showscale: false,
     hoverinfo: 'skip',
     marker: {
@@ -1198,7 +1200,7 @@ async function refreshMap(sidePanel) {
       }
     };
   
-
+    console.log('metriqueType', metriqueType)
     if (metriqueType === "Categorie") {
       baseChoropleth.z = records1.map(r => Number(r.Valeur));
       traces.push(baseChoropleth);
@@ -1505,13 +1507,14 @@ function buildLegend(records, unknown) {
   legend.appendChild(titre);
   
   const colors = metriqueCouleurCat.split(',');
+
   const noms = metriqueNomCat.split(','); 
   
   let liste = document.createElement("div");
   liste.className = "legend-list";
   legend.appendChild(liste);
   // CAS 1 : Catégorie
-  if (metriqueType == "Categorie" ) {
+  if (metriqueType == "Categorie") {
       
     const categories = [...new Set(
       records.map(r => Number(r.Valeur))
@@ -1540,17 +1543,18 @@ function buildLegend(records, unknown) {
   }
 
   if (metriqueType === "Seuils") {
+    const colors = metriqueCouleurCat.split(",");
     const classes = [
       {
-        label: noms[0],
+        label: `< ${metriqueSeuil1}`,
         color: colors[0]
       },
       {
-        label: noms[1],
+        label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
         color: colors[1]
       },
       {
-        label: noms[2],
+        label: `> ${metriqueSeuil2}`,
         color: colors[2]
       }
     ];
@@ -1607,10 +1611,11 @@ function buildLegend(records, unknown) {
   }
 }
 
-function buildColorscale(liste) { 
+function buildColorscale(nbCat) { 
   const colors = metriqueCouleurCat.split(',');  
   const scale = []; 
   //console.log('metriqueType',metriqueType)
+  //console.log('list',liste)
   if (metriqueType === "Seuils") { 
     const n=3
     for (let i = 0; i < n; i++) {
@@ -1619,9 +1624,10 @@ function buildColorscale(liste) {
       scale.push([start, colors[i]]);
       scale.push([end, colors[i]]);
     }
+    return scale; 
   }
   if (metriqueType === "Categorie") {
-    const n = liste.length; 
+    const n = nbCat ; // liste.length; 
     for (let i = 0; i < n; i++) {
       const start = i / n;
       const end = (i + 1) / n;
@@ -1629,9 +1635,9 @@ function buildColorscale(liste) {
       scale.push([start, colors[i]]);
       scale.push([end, colors[i]]);
     }
-    
+    return scale; 
   }
-  return scale; 
+  
 }
 
 function downloadImage(dataUrl, filename) {
