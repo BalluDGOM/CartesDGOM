@@ -1511,7 +1511,7 @@ function buildLegend(records, unknown) {
   liste.className = "legend-list";
   legend.appendChild(liste);
   // CAS 1 : Catégorie
-  if (metriqueType == "Categorie") {
+  if (metriqueType == "Categorie" ) {
       
     const categories = [...new Set(
       records.map(r => Number(r.Valeur))
@@ -1540,18 +1540,17 @@ function buildLegend(records, unknown) {
   }
 
   if (metriqueType === "Seuils") {
-    const colors = metriqueCouleurCat.split(",");
     const classes = [
       {
-        label: `< ${metriqueSeuil1}`,
+        label: noms[0],
         color: colors[0]
       },
       {
-        label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
+        label: noms[1],
         color: colors[1]
       },
       {
-        label: `> ${metriqueSeuil2}`,
+        label: noms[2],
         color: colors[2]
       }
     ];
