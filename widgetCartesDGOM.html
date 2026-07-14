@@ -577,10 +577,10 @@ grist.ready({
     { name: "AfficherNomEPCI", type: "Bool", title: "Afficher Nom EPCI" },
     
     { name: "AfficherPointsCommunes", type: "Bool", title: "Afficher Points Communes" },
-    { name: "DimensionPointsCommunes", type: "Any", title: "Dimension Points Communes" },
+    { name: "DimensionPtCommunes", type: "Any", title: "Dimension Points Communes" },
     { name: "AfficherPointsMairies", type: "Bool", title: "Afficher Points Mairies" },
     { name: "AfficherPointsEPCI", type: "Bool", title: "Afficher Points EPCI" },
-    { name: "DimensionPointsEPCI", type: "Any", title: "Dimension Points EPCI" },
+    { name: "DimensionPtEPCI", type: "Any", title: "Dimension Points EPCI" },
     
     { name: "Type", type: "Any", title: "Type" },
     { name: "Seuil1", type: "Numeric", title: "Seuil 1" },
@@ -621,9 +621,6 @@ let select = document.getElementById("territoireSelect");
 let pendingSelectedValue = null;
 let metrique;
 let metriqueNom;
-let indId1;
-let indId2;
-let indId3;
 let titreLegende;
 let EPCIestLaLegende;
 let showChoroplethe;
@@ -818,13 +815,13 @@ async function initMetrique() {
   showTextEPCI = metrique.AfficherNomEPCI ;
 
   showPoints = metrique.AfficherPointsCommunes ;
-  textPointsUnit = metrique.DimensionPointsCommunes ;
+  textPointsUnit = metrique.DimensionPtCommunes ;
   showPointsAtMairies = metrique.AfficherPointsAtMairies;
 
   showPointsMairies = metrique.AfficherPointsMairies ;  
 
   showPointsEPCI = metrique.AfficherPointsEPCI ;
-  textPointsUnitEPCI = metrique.DimensionPointsEPCI ; 
+  textPointsUnitEPCI = metrique.DimensionPtEPCI ; 
 
   showGeo = metrique.AfficherGeographie ;
   metriqueType = metrique.Type ;
@@ -1073,7 +1070,7 @@ async function refreshMap(sidePanel) {
     Plotly.purge('chart');
     return;
   }
-  //console.log("Refreshmap : ", dataRecords)
+  console.log("Refreshmap : ", dataRecords)
   let recordsTerr 
   if (geoRow.estFranceAll) {
     franceAll = true ;
@@ -1446,6 +1443,7 @@ grist.onRecord(async (record) => {
   // Sécurité : si aucun enregistrement n'est sélectionné
   if (!record) return;
   metrique = record
+  console.log("metrique", metrique)
   try {
     // On récupère toute la table "données"
     const donneesTable = await grist.docApi.fetchTable('Donnees');
@@ -1460,13 +1458,14 @@ grist.onRecord(async (record) => {
       }
       rows.push(row);
     }
-
+    console.log("rows", rows)
     // Filtre : ne garde que les données dont la liste de métriques contient l'id sélectionné
     dataRecords = rows.filter(r => {
-      const metriquesCol = r.Metriques; // nom de votre colonne Reference List
+      const metriquesCol = r.Metriques; 
       const ids = Array.isArray(metriquesCol) ? metriquesCol.filter(v => typeof v === 'number') : [];
       return ids.includes(metrique.id);
     });
+     console.log("dataRecords", dataRecords)
 
     // ==========================================
     // LANCEMENT DES FONCTIONS APRÈS RÉCUPÉRATION
