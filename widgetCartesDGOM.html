@@ -40,7 +40,20 @@
       gap: 10px;
       justify-content: flex-start;
     }
-
+    #legend.hidden {
+      display: none !important;
+    }
+    .legend-point-floating {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 10px;
+      flex-direction: column;   /* ← ajouté : empile les enfants verticalement */
+    }
     /* Le conteneur principal à gauche */
     #sidebar {
       position: fixed;
@@ -1128,18 +1141,44 @@ async function refreshMap(sidePanel) {
     records3 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId3)) && (r.porteeValeur === 'EPCI'))
   } 
 
-  console.log("records1 : " + metrique.IndId1)
+  /*console.log("records1 : " + metrique.IndId1)
   console.log("records1", records1)
   console.log("records2 : " + metrique.IndId2)
   console.log("records2", records2)
   console.log("records3 : " + metrique.IndId3)
-  console.log("records3", records3)
+  console.log("records3", records3)*/
   //const colorsSet = [...new Set(records1.map(r => Number(r.Valeur)))].sort((a, b) => a - b); // a priri inutile vu qu'on fixe dorénavant le nombre de catégories
   //const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
   const colorscale = metriqueCouleurCat ? buildColorscale(metriqueCouleurCat.split(',').length) : metriqueType; 
   const traces = [];     
-  console.log("colorscale", colorscale)   
-  console.log("metriqueCouleurCat", metriqueCouleurCat)   
+  /*console.log("colorscale", colorscale)   
+  console.log("metriqueCouleurCat", metriqueCouleurCat)   */
+  let standard = metriqueType !== "Seuils" && metriqueType !== "Categorie"
+  let colorbarConfig
+  if (standard) { 
+    const titleText = titreLegende ? titreLegende : (metriqueNom || "");
+    
+    // Configuration de la colorbar dans la trace de votre choroplèthe Plotly
+    // Note : appliquez cette configuration à la trace de votre choroplèthe (ex: traceChoroplethe)
+   colorbarConfig = {
+      title: {
+        text: `<b>${titleText}</b>`,
+        side: "top", // Place le titre juste au-dessus de la barre
+        font: {
+          family: "Marianne, Arial, sans-serif",
+          size: 12,
+          color: "#08306B"
+        }
+      },
+      thickness: 15,
+      len: 0.6, // Hauteur de la barre (60% de la hauteur de la carte)
+      x: 0.90,  // Positionnement à droite
+      y: 0.6,
+      ticklen: 5,
+      tickformat: ",d",
+      tickcolor: "#FFFFFF",
+    };
+  }
 
   // Couche choroplethe fond (communes sans data)
       // 1. On trouve les codes INSEE du territoire qui N'ONT PAS de données dans records
@@ -1185,6 +1224,8 @@ async function refreshMap(sidePanel) {
     locations: records1.map(r => String(r.Code_Insee)),
     featureidkey: 'properties.code_insee',
     colorscale: colorscale,
+    colorbar: standard ? colorbarConfig : false,
+    showscale: standard ? true : false,
     zmin: 1,  
     zmax: metriqueCouleurCat.split(',').length,
     showscale: false,
@@ -1197,7 +1238,7 @@ async function refreshMap(sidePanel) {
       }
     };
   
-    console.log('metriqueType', metriqueType)
+    //console.log('metriqueType', metriqueType)
     if (metriqueType === "Categorie") {
       baseChoropleth.z = records1.map(r => Number(r.Valeur));
       traces.push(baseChoropleth);
@@ -1375,7 +1416,8 @@ async function refreshMap(sidePanel) {
       },
       zoom: zoomCarte
     },
-    margin: { l: 0, r: 0, t: 0, b: 0 }
+    margin: { l: 0, r: 0, t: 0, b: 0 },
+    separators: ". "
   };
 
   // Enregistrement du territoire courant pour le prochain clic/refresh
@@ -1443,7 +1485,7 @@ grist.onRecord(async (record) => {
   // Sécurité : si aucun enregistrement n'est sélectionné
   if (!record) return;
   metrique = record
-  console.log("metrique", metrique)
+  //console.log("metrique", metrique)
   try {
     // On récupère toute la table "données"
     const donneesTable = await grist.docApi.fetchTable('Donnees');
@@ -1458,14 +1500,14 @@ grist.onRecord(async (record) => {
       }
       rows.push(row);
     }
-    console.log("rows", rows)
+   // console.log("rows", rows)
     // Filtre : ne garde que les données dont la liste de métriques contient l'id sélectionné
     dataRecords = rows.filter(r => {
       const metriquesCol = r.Metriques; 
       const ids = Array.isArray(metriquesCol) ? metriquesCol.filter(v => typeof v === 'number') : [];
       return ids.includes(metrique.id);
     });
-     console.log("dataRecords", dataRecords)
+     //console.log("dataRecords", dataRecords)
 
     // ==========================================
     // LANCEMENT DES FONCTIONS APRÈS RÉCUPÉRATION
@@ -1498,116 +1540,157 @@ grist.onOptions((options, interaction) => {
 
 
 function buildLegend(records, unknown) {
-  const legend = document.getElementById("legend");
-  legend.innerHTML = "";
-  const titre = document.createElement("div");
-  titre.className = "legend-titre";
-  titre.innerHTML = `<span>${titreLegende}</span>`
-  legend.appendChild(titre);
+  const legendDiv = document.getElementById("legend");
   
-  const colors = metriqueCouleurCat.split(',');
-
-  const noms = metriqueNomCat.split(','); 
-  
-  let liste = document.createElement("div");
-  liste.className = "legend-list";
-  legend.appendChild(liste);
-  // CAS 1 : Catégorie
-  if (metriqueType == "Categorie") {
-      
-    const categories = [...new Set(
-      records.map(r => Number(r.Valeur))
-    )].sort((a,b) => a - b);
-
-    //console.log("categories", categories)
-    
-    categories.forEach(cat => {
-      const color = colors[cat - 1];
-      let label =""
-      if (EPCIestLaLegende) {
-        label = records.find(r => Number(r.Valeur) == cat )?.NomEPCI || cat;
-      } else {
-        label = noms[cat-1];
-      }
-      const item = document.createElement("div");
-      item.className = "legend-item";
-      item.innerHTML = `
-        <div class="legend-color"
-            style="background:${color}">
-        </div>
-        <span class="legend-text">${label}</span>
-      `;
-      liste.appendChild(item);
-    });
-  }
-
-  if (metriqueType === "Seuils") {
-    const colors = metriqueCouleurCat.split(",");
-    const classes = [
-      {
-        label: `< ${metriqueSeuil1}`,
-        color: colors[0]
-      },
-      {
-        label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
-        color: colors[1]
-      },
-      {
-        label: `> ${metriqueSeuil2}`,
-        color: colors[2]
-      }
-    ];
-   
-    classes.forEach(c => {
-
-      const item = document.createElement("div");
-      item.className = "legend-item";
-
-      item.innerHTML = `
-        <div class="legend-color"
-             style="background:${c.color}">
-        </div>
-        <span class="legend-text">${c.label}</span>
-      `;
-
-      liste.appendChild(item);
-    });
-  }
-  if ((metriqueType === "Categorie" || metriqueType === "Seuils") && unknown > 2 ) { // >2 car [ "L", 973 ] quand on a tout L + code du territoire lui-même
-      const item = document.createElement("div");
-      item.className = "legend-item";
-
-      item.innerHTML = `
-        <div class="legend-color"
-             style="background:${couleurFond}">
-        </div>
-        <span class="legend-text">Absence de données</span>
-      `;
-
-      liste.appendChild(item);
+  if (metriqueType !== "Seuils" && metriqueType !== "Categorie") {
+    legendDiv.classList.add("hidden");
+    if (document.getElementById("floatDiv") !== null ) { // pour éviter la multiplication des éléments
+      document.getElementById("floatDiv").remove()
     }
-  if (showPoints) {
     const item = document.createElement("div");
+    item.className = "legend-point-floating";
+    item.id ="floatDiv"
+    document.getElementById("graph").appendChild(item);
+    if (showPoints) {
+      const item = document.createElement("div");
       item.className = "legend-item";
       item.innerHTML = `
         <div class="legend-point"
-             style="background:${pointColor}">
+            style="background:${pointColor}">
         </div>
         <span class="legend-text">${textPointsUnit}</span>
       `
-    legend.appendChild(item);
-  }
-  if (showPointsEPCI) {
-    const item = document.createElement("div");
+      document.getElementById("floatDiv").appendChild(item);
+    }
+    if (showPointsEPCI) {
+      const item = document.createElement("div");
       item.className = "legend-item";
       item.innerHTML = `
-        <div class="legend-point"
-             style="background:${pointColorEPCI}">
-        </div>
-        <span class="legend-text">${textPointsUnitEPCI}</span>
-      `
-    legend.appendChild(item);
-  }
+          <div class="legend-point"
+              style="background:${pointColorEPCI}">
+          </div>
+          <span class="legend-text">${textPointsUnitEPCI}</span>
+        `
+      document.getElementById("floatDiv").appendChild(item);
+    }
+
+  } else {
+    // Si c'est 'Seuils' ou 'Categories', on réaffiche la légende HTML standard
+    legendDiv.classList.remove("hidden");
+    
+    // Vider et reconstruire votre légende HTML custom ici...
+    legendDiv.innerHTML = ""; 
+    if (titreLegende) {
+      const titleEl = document.createElement("div");
+      titleEl.className = "legend-titre";
+      titleEl.textContent = titreLegende;
+      legendDiv.appendChild(titleEl);
+    }
+    const noms = metriqueNomCat.split(','); 
+    const colors = metriqueCouleurCat.split(',');
+  
+    let liste = document.createElement("div");
+    liste.className = "legend-list";
+    legend.appendChild(liste);
+    // CAS 1 : Catégorie
+    if (metriqueType == "Categorie") {
+        
+      const categories = [...new Set(
+        records.map(r => Number(r.Valeur))
+      )].sort((a,b) => a - b);
+
+      //console.log("categories", categories)
+      
+      categories.forEach(cat => {
+        const color = colors[cat - 1];
+        let label =""
+        if (EPCIestLaLegende) {
+          label = records.find(r => Number(r.Valeur) == cat )?.NomEPCI || cat;
+        } else {
+          label = noms[cat-1];
+        }
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <div class="legend-color"
+              style="background:${color}">
+          </div>
+          <span class="legend-text">${label}</span>
+        `;
+        liste.appendChild(item);
+      });
+    }
+
+    if (metriqueType === "Seuils") {
+      const colors = metriqueCouleurCat.split(",");
+      const classes = [
+        {
+          label: `< ${metriqueSeuil1}`,
+          color: colors[0]
+        },
+        {
+          label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
+          color: colors[1]
+        },
+        {
+          label: `> ${metriqueSeuil2}`,
+          color: colors[2]
+        }
+      ];
+    
+      classes.forEach(c => {
+
+        const item = document.createElement("div");
+        item.className = "legend-item";
+
+        item.innerHTML = `
+          <div class="legend-color"
+              style="background:${c.color}">
+          </div>
+          <span class="legend-text">${c.label}</span>
+        `;
+
+        liste.appendChild(item);
+      });
+    }
+    if ((metriqueType === "Categorie" || metriqueType === "Seuils") && unknown > 2 ) { // >2 car [ "L", 973 ] quand on a tout L + code du territoire lui-même
+        const item = document.createElement("div");
+        item.className = "legend-item";
+
+        item.innerHTML = `
+          <div class="legend-color"
+              style="background:${couleurFond}">
+          </div>
+          <span class="legend-text">Absence de données</span>
+        `;
+
+        liste.appendChild(item);
+    }
+    if (showPoints) {
+      const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <div class="legend-point"
+              style="background:${pointColor}">
+          </div>
+          <span class="legend-text">${textPointsUnit}</span>
+        `
+      legend.appendChild(item);
+    }
+    if (showPointsEPCI) {
+      const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <div class="legend-point"
+              style="background:${pointColorEPCI}">
+          </div>
+          <span class="legend-text">${textPointsUnitEPCI}</span>
+        `
+      legend.appendChild(item);
+    }
+  } 
+  
+  
 }
 
 function buildColorscale(nbCat) { 
