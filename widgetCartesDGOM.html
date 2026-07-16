@@ -9,7 +9,7 @@
 
   <style>
     html, body {
-      margin: 0;F
+      margin: 0;
       height: 100%;
       font-family: "Marianne", Arial, sans-serif;
       color: #08306B;
@@ -273,7 +273,7 @@
     /* Alignement du contrôle (color picker ou switch) */
     .color-row input[type="color"], .color-row .switch, .checkbox-row .switch {
     justify-self: end;                 /* pousse le contrôle à droite */
-    margin-right: 30px;
+    margin-right: 10px;
     }
    
     
@@ -365,7 +365,6 @@
         color: #08306B !important; /* Force la couleur bleu foncé au cas où un autre style l'écrase */
         font-size: 10px; 
         min-width: 24px; 
-        text-align: right; 
         flex-shrink: 0; 
         display: inline-block; /* Assure que la largeur minimale est respectée */
     }
@@ -439,6 +438,13 @@
         <input type="range" id="lineWidthSlider" min="0" max="30" value="1">
         <span id="lineWidthValue" class="options-text">1</span>
       </div>
+      <div class="checkbox-row" style="margin-top: 8px; ">
+        <label>
+            <input type="checkbox" id="showHoverInfo" >
+            Montrer les informations au survol
+        </label>
+      </div>
+      
     </div>
     <hr class="separator">
     <b>Communes</b>
@@ -557,10 +563,10 @@
           <span class="slider"></span>
       </label>
     </div>  
-     <div class="checkbox-row">
+    <div class="checkbox-row">
       <span class="options-text">Montrer la géographie <br/>(nom des îles)</span>
       <label class="switch">
-          <input type="checkbox" id="showGeoValue">
+          <input type="checkbox" id="showGeo">
           <span class="slider"></span>
       </label>
     </div> 
@@ -617,6 +623,7 @@ grist.ready({
     
     { name: "CouleurLigne", type: "Any", title: "Couleur Ligne" },
     { name: "EpaisseurLigne", type: "Numeric", title: "Epaisseur Ligne" },
+    { name: "SurvolCarte", type: "Bool", title: "Infos au survol" },
     { name: "MontrerLeFond", type: "Bool", title: "Montrer le Fond" },
     { name: "CarteDGOM", type: "Bool", title: "Carte DGOM" },
     { name: "Entite", type: "Any", title: "Entité" },
@@ -658,6 +665,7 @@ let textColor = "#000000";
 let textColorEPCI = "#000000";
 let lineColor;
 let lineWidth;
+let showHoverInfo;
 let pointColor = "#000000";
 let pointColorEPCI = "#000000";
 let toolbarVisible = true;
@@ -670,6 +678,10 @@ let dernierTerritoireAffiche = null;
 
 const couleurFond = '#c0c0c0'
 const showChoropletheValue = document.getElementById("showChoropletheValue");
+const lineColorPicker = document.getElementById("lineColorPicker");
+const lineWidthSlider = document.getElementById("lineWidthSlider");
+const lineWidthValue = document.getElementById("lineWidthValue");
+const showHoverInfoValue = document.getElementById("showHoverInfo");
 
 const showTextValue = document.getElementById("showTextValue");
 const showTextValueMairies = document.getElementById("showTextValueMairies");
@@ -681,7 +693,7 @@ const showPointsValue = document.getElementById("showPointsValue");
 const showPointsValueMairie = document.getElementById("showPointsValueMairie");
 const showPointsValueEPCI = document.getElementById("showPointsValueEPCI");
 
-const showGeoValue = document.getElementById("showGeoValue");
+const showGeoSwitch = document.getElementById("showGeo");
 
 const fontSizeSlider = document.getElementById("fontSizeSlider");
 const fontSizeValue = document.getElementById("fontSizeValue");
@@ -694,11 +706,6 @@ const textColorPickerMairie = document.getElementById("textColorPickerMairie");
 const fontSizeSliderEPCI = document.getElementById("fontSizeSliderEPCI");
 const fontSizeValueEPCI = document.getElementById("fontSizeValueEPCI");
 const textColorPickerEPCI = document.getElementById("textColorPickerEPCI");
-
-const lineColorPicker = document.getElementById("lineColorPicker");
-const lineWidthSlider = document.getElementById("lineWidthSlider");
-const lineWidthValue = document.getElementById("lineWidthValue");
-
 
 const pointColorPicker = document.getElementById("pointColorPicker");
 const pointColorPickerMairie = document.getElementById("pointColorPickerMairie");
@@ -858,6 +865,7 @@ async function initMetrique() {
 
   lineColor = metrique.CouleurLigne ?? "#000000";
   lineWidth = metrique.EpaisseurLigne ?? 1;
+  showHoverInfo = metrique.SurvolCarte ?? 1;
   showMap = metrique.MontrerLeFond ?? false;
   DGOMMap = metrique.CarteDGOM ?? false;
   entiteMetrique = metrique.Entite;
@@ -895,7 +903,8 @@ async function initMetrique() {
 
   lineColorPicker.value = lineColor;
   lineWidthSlider.value = lineWidth;
-  showGeoValue.checked = showGeo;
+  showHoverInfoValue.checked = showHoverInfo;
+  showGeoSwitch.checked = showGeo;
   showMapSwitch.checked = showMap;
   DGOMMapSwitch.checked = DGOMMap;
 
@@ -1005,7 +1014,7 @@ async function init() {
       document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
       refreshMap(true);
     });
-    showGeoValue.addEventListener("change", (e) => { 
+    showGeoSwitch.addEventListener("change", (e) => { 
       showGeo = e.target.checked ;
       refreshMap(true);
     });
@@ -1046,6 +1055,10 @@ async function init() {
     });
   pointColorPickerEPCI.addEventListener("input", (e) => {
       pointColorEPCI = e.target.value;
+      refreshMap(true);
+    });
+  showHoverInfoValue.addEventListener("input", (e) => {
+      showHoverInfo = e.target.checked;
       refreshMap(true);
     });
   showMapSwitch.addEventListener("input", (e) => {
@@ -1229,7 +1242,8 @@ async function refreshMap(sidePanel) {
     zmin: 1,  
     zmax: metriqueCouleurCat.split(',').length,
     showscale: false,
-    hoverinfo: 'skip',
+    hoverinfo: showHoverInfo ? 'text' : 'skip',
+    text: records1.map(r => `${r.NomCommune} : ${fmt.format(r.Valeur)}`),
     marker: {
       line: {
         color: lineColor,
@@ -1764,6 +1778,7 @@ async function saveMetricOptions() {
         CouleurPointEPCI: pointColorEPCI,
         CouleurLigne: lineColor,
         EpaisseurLigne: lineWidth,
+        SurvolCarte: showHoverInfo,
         MontrerLeFond: showMap,
         CarteDGOM: DGOMMap,
         AfficherGeographie: showGeo
