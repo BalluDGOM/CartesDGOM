@@ -1375,6 +1375,7 @@ async function refreshMap(sidePanel) {
         ...new Map(recordsTerr.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
       ];
     }
+    console.log("uniqueRecords", uniqueRecords)
     traces.push({
       type: 'scattermapbox', // Changement ici
       lon: franceAll ? uniqueRecords.map(r => Number(r.longGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
