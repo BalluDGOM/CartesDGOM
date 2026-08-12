@@ -564,7 +564,7 @@
       </label>
     </div>  
     <div class="checkbox-row">
-      <span class="options-text">Montrer la géographie <br/>(nom des îles)</span>
+      <span class="options-text">Montrer la géographie <br/>(nom des îles ou nom des territoires en vue France entière)</span>
       <label class="switch">
           <input type="checkbox" id="showGeo">
           <span class="slider"></span>
@@ -604,6 +604,8 @@ grist.ready({
     { name: "Type", type: "Any", title: "Type" },
     { name: "Seuil1", type: "Numeric", title: "Seuil 1" },
     { name: "Seuil2", type: "Numeric", title: "Seuil 2" },
+    { name: "Seuil3", type: "Numeric", title: "Seuil 3" },
+    { name: "Seuil4", type: "Numeric", title: "Seuil 4" },
     { name: "CouleurCategories", type: "Any", title: "Couleurs" },
     { name: "NomCategories", type: "Any", title: "Noms" },
     
@@ -637,6 +639,8 @@ let territoire;
 let franceAll = false;
 let dataRecords = [];
 let territoireRows = [];
+let stMartinId;
+let stBarthId;
 let select = document.getElementById("territoireSelect");
 let pendingSelectedValue = null;
 let metrique;
@@ -657,6 +661,8 @@ let textPointsUnitEPCI ;
 let metriqueType;
 let metriqueSeuil1;
 let metriqueSeuil2;
+let metriqueSeuil3;
+let metriqueSeuil4;
 let metriqueCouleurCat;
 let metriqueNomCat;
 let textSize = 12;
@@ -847,6 +853,8 @@ async function initMetrique() {
   metriqueType = metrique.Type ;
   metriqueSeuil1 = metrique.Seuil1 ;
   metriqueSeuil2 = metrique.Seuil2 ;
+  metriqueSeuil3 = metrique.Seuil3 ;
+  metriqueSeuil4 = metrique.Seuil4 ;
   metriqueCouleurCat = metrique.CouleurCategories ;
   metriqueNomCat = metrique.NomCategories ;
 
@@ -953,6 +961,8 @@ async function init() {
       zoomCarteDGOM: ref.ZoomCarteDGOM[i],
       latDGOM2: ref.latDGOM2[i],
       longDGOM2: ref.longDGOM2[i],
+      latDGOM2v: ref.latDGOM2v[i],
+      longDGOM2v: ref.longDGOM2v[i],
       libelle: ref.libelle[i],
       tailleLibelle: ref.tailleLibelle[i],
       couleurLibelle: ref.couleurLibelle[i],
@@ -961,6 +971,8 @@ async function init() {
     })); 
   //console.log("territoireRows",territoireRows)
   territoireRows.forEach(row => {
+    if (row.code_insee == '978') { stMartinId = row.territoireId;}
+    if (row.code_insee == '977') { stBarthId = row.territoireId;}
     const option =  document.createElement("option");
     if (row.geoJson) {
       option.value = row.territoire;
@@ -971,6 +983,7 @@ async function init() {
   applySavedValue();
   select.addEventListener('change', (event) => {
       const selectedValue = event.target.value;
+
       refreshMap(true)
       // Enregistre la valeur sous la clé 'selectedView'
       grist.setOption('selectedView', selectedValue);
@@ -1098,9 +1111,11 @@ async function refreshMap(sidePanel) {
   }
   console.log("Refreshmap : ", dataRecords)
   let recordsTerr 
-  if (geoRow.estFranceAll) {
+  if (geoRow.estFranceAll ) {
     franceAll = true ;
     recordsTerr = dataRecords
+  } else if (geoRow.code_insee == '978-977' ) {
+    recordsTerr = dataRecords.filter(r => r.territoire === stMartinId || r.territoire === stBarthId);
   } else {
     recordsTerr = dataRecords.filter(r => r.territoire === geoRow.territoireId);
   }
@@ -1117,7 +1132,7 @@ async function refreshMap(sidePanel) {
     await initMetrique();
   }
   document.getElementById("info").innerHTML = "";
-  document.getElementById("titre").innerHTML =  territoire + " - " + metriqueNom;
+  document.getElementById("titre").innerHTML =  geoRow.libelle + " - " + metriqueNom;
 
   const fmt = new Intl.NumberFormat('fr-FR');   // → utilise «  » (espace insécable) entre les groupes
   const latCentreCarte = DGOMMap ? (geoRow.latCentreCarteDGOM ? geoRow.latCentreCarteDGOM : geoRow.latCentreCarte) : geoRow.latCentreCarte;
@@ -1154,18 +1169,16 @@ async function refreshMap(sidePanel) {
     records3 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId3)) && (r.porteeValeur === 'EPCI'))
   } 
 
-  console.log("records1 : " + metrique.IndId1)
+  /*console.log("records1 : " + metrique.IndId1)
   console.log("records1", records1)
   console.log("records2 : " + metrique.IndId2)
   console.log("records2", records2)
   console.log("records3 : " + metrique.IndId3)
-  console.log("records3", records3)
-  //const colorsSet = [...new Set(records1.map(r => Number(r.Valeur)))].sort((a, b) => a - b); // a priri inutile vu qu'on fixe dorénavant le nombre de catégories
-  //const colorscale = metriqueCouleurCat ? buildColorscale(colorsSet) : metriqueType; 
+  console.log("records3", records3)*/
+ 
   const colorscale = metriqueCouleurCat ? buildColorscale(metriqueCouleurCat.split(',').length) : metriqueType; 
+
   const traces = [];     
-  /*console.log("colorscale", colorscale)   
-  console.log("metriqueCouleurCat", metriqueCouleurCat)   */
   let standard = metriqueType !== "Seuils" && metriqueType !== "Categorie"
   let colorbarConfig
   if (standard) { 
@@ -1196,13 +1209,40 @@ async function refreshMap(sidePanel) {
   // Couche choroplethe fond (communes sans data)
       // 1. On trouve les codes INSEE du territoire qui N'ONT PAS de données dans records
     const codesAvecData = new Set(records1.map(r => String(r.Code_Insee)));
-    //console.log("codesAvecData " , codesAvecData)
     const codesTerritoireSansData = geoRow.codes_insee_communes.filter(code => {
       if (typeof code !== 'number' && typeof code !== 'string') return false;
       return !codesAvecData.has(String(code));
     });
 
-    if (showChoroplethe && codesTerritoireSansData.length > 2) {
+    if (geoRow.code_insee == '978-977' || geoRow.estFranceAll ) { //mettre en sable Sint Maarten
+      const couleurTerre  = '#e0e0c2'
+      let stMarteensChoropleth =  {
+        type: 'choroplethmapbox',
+        geojson: cleanedGeojson,
+        locations: ['sintMaarten'], // Uniquement les communes vides
+        featureidkey: 'properties.code_insee',
+        // Pour forcer TOUT le fond en gris uniforme :
+        // On définit une échelle où le minimum (0) et le maximum (1) renvoient du gris
+        colorscale: [
+          [0, couleurTerre],
+          [1, couleurTerre]
+        ],
+        z: [0],
+        
+        showscale: false,
+        hoverinfo: 'skip',
+        marker: {
+          line: {
+            color: lineColor,
+            width: lineWidth / 10
+          }
+        }
+      };
+      traces.push(stMarteensChoropleth);
+      
+    }
+
+    if (showChoroplethe && codesTerritoireSansData.length > 2) { //mettre en gris les communes sans data de la carte
       let fondChoropleth = {
         type: 'choroplethmapbox',
         geojson: cleanedGeojson,
@@ -1261,7 +1301,9 @@ async function refreshMap(sidePanel) {
         const v = Number(r.Valeur);
         if (v < metriqueSeuil1) return 1;
         if (v <= metriqueSeuil2) return 2;
-        return 3;
+        if (v <= metriqueSeuil3) return 3;
+        if (v <= metriqueSeuil4) return 4;
+        return 5;
       });
       traces.push(baseChoropleth);
     } else {
@@ -1278,16 +1320,19 @@ async function refreshMap(sidePanel) {
 
   // --- COUCHE POINTS COMMUNES (MAPBOX) ---
   if (showPoints && records2) {
+    const uniqueRecords = [
+      ...new Map(records2.map(r => [`${r.lat}|${r.long}`, r])).values()
+    ];
     let maxValue;
     let markerSizes;
-    maxValue = Math.max(...records2.map(r => Number(r.Valeur)));
-    markerSizes = records2.map(r =>
+    maxValue = Math.max(...uniqueRecords.map(r => Number(r.Valeur)));
+    markerSizes = uniqueRecords.map(r =>
     Math.sqrt(Number(r.Valeur) / maxValue) * 40 * pointSize / 3 );
     
     traces.push({
       type: 'scattermapbox',
-      lon:  franceAll ? records2.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? records2.map(r => Number(r.longMairieDGOM)) : records2.map(r => Number(r.longMairie)) ) : (DGOMMap ? records2.map(r => Number(r.longDGOM)) : records2.map(r => Number(r.long)) ),
-      lat: franceAll ? records2.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? records2.map(r => Number(r.latMairieDGOM)) : records2.map(r => Number(r.latMairie)) ) : (DGOMMap ? records2.map(r => Number(r.latDGOM)) : records2.map(r => Number(r.lat)) ),
+      lon:  franceAll ? uniqueRecords.map(r => Number(r.longDGOM2)) : showPointsAtMairies ? (DGOMMap ? uniqueRecords.map(r => Number(r.longMairieDGOM)) : uniqueRecords.map(r => Number(r.longMairie)) ) : (DGOMMap ? uniqueRecords.map(r => Number(r.longDGOM)) : uniqueRecords.map(r => Number(r.long)) ),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latDGOM2)) : showPointsAtMairies ? (DGOMMap ? uniqueRecords.map(r => Number(r.latMairieDGOM)) : uniqueRecords.map(r => Number(r.latMairie)) ) : (DGOMMap ? uniqueRecords.map(r => Number(r.latDGOM)) : uniqueRecords.map(r => Number(r.lat)) ),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1296,17 +1341,20 @@ async function refreshMap(sidePanel) {
         opacity: 0.7,
         line: { width: 1, color: 'white' } 
       },
-      text: records2.map(r => `${r.NomCommune}<br>${textPointsUnit} : ${fmt.format(r.Valeur)}`),
+      text: uniqueRecords.map(r => `${r.NomCommune}<br>${textPointsUnit} : ${fmt.format(r.Valeur)}`),
       hovertemplate: '%{text}<extra></extra>'
     });
   }
 
   // --- COUCHE POINTS Mairie  ---
   if (showPointsMairies) {    
+    const uniqueRecords = [
+      ...new Map(recordsTerr.map(r => [`${r.lat}|${r.long}`, r])).values()
+    ];
     traces.push({
       type: 'scattermapbox', 
-      lon: DGOMMap ? recordsTerr.map(r => Number(r.longMairieDGOM)) : recordsTerr.map(r => Number(r.longMairie)),
-      lat: DGOMMap ? recordsTerr.map(r => Number(r.latMairieDGOM)) : recordsTerr.map(r => Number(r.latMairie)),
+      lon: DGOMMap ? uniqueRecords.map(r => Number(r.longMairieDGOM)) : uniqueRecords.map(r => Number(r.longMairie)),
+      lat: DGOMMap ? uniqueRecords.map(r => Number(r.latMairieDGOM)) : uniqueRecords.map(r => Number(r.latMairie)),
       mode: 'markers',
       showlegend: false, 
       marker: {
@@ -1349,12 +1397,15 @@ async function refreshMap(sidePanel) {
 
   // --- COUCHE TEXTE COMMUNES (MAPBOX) ---
   if (showText) {    
+    const uniqueRecords = [
+      ...new Map(recordsTerr.map(r => [`${r.lat}|${r.long}`, r])).values()
+    ];
     traces.push({
       type: 'scattermapbox', // Changement ici
-      lon: franceAll ? recordsTerr.map(r => Number(r.longDGOM2)) : showTextAtMairies ? (DGOMMap ? recordsTerr.map(r => Number(r.longMairieDGOM)) : recordsTerr.map(r => Number(r.longMairie))) : (DGOMMap ? recordsTerr.map(r => Number(r.longDGOM)) : recordsTerr.map(r => Number(r.long))),
-      lat: franceAll ? recordsTerr.map(r => Number(r.latDGOM2)) : showTextAtMairies ? (DGOMMap ? recordsTerr.map(r => Number(r.latMairieDGOM)) : recordsTerr.map(r => Number(r.latMairie))) : (DGOMMap ? recordsTerr.map(r => Number(r.latDGOM)) : recordsTerr.map(r => Number(r.lat))),
+      lon: franceAll ? uniqueRecords.map(r => Number(r.longDGOM2)) : showTextAtMairies ? (DGOMMap ? uniqueRecords.map(r => Number(r.longMairieDGOM)) : uniqueRecords.map(r => Number(r.longMairie))) : (DGOMMap ? uniqueRecords.map(r => Number(r.longDGOM)) : uniqueRecords.map(r => Number(r.long))),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latDGOM2)) : showTextAtMairies ? (DGOMMap ? uniqueRecords.map(r => Number(r.latMairieDGOM)) : uniqueRecords.map(r => Number(r.latMairie))) : (DGOMMap ? uniqueRecords.map(r => Number(r.latDGOM)) : uniqueRecords.map(r => Number(r.lat))),
       mode: 'text',
-      text: recordsTerr.map(r => r.NomCommune),
+      text: uniqueRecords.map(r => r.NomCommune),
       showlegend: false, 
       textfont: {
         size: textSize,
@@ -1364,7 +1415,7 @@ async function refreshMap(sidePanel) {
     });
   }
 
-  if (showGeo) {
+  if (showGeo && !franceAll) {
     let uniqueRecords = [] 
     if (DGOMMap) {
         uniqueRecords = [
@@ -1375,19 +1426,24 @@ async function refreshMap(sidePanel) {
         ...new Map(recordsTerr.map(r => [`${r.latGeo}|${r.longGeo}`, r])).values()
       ];
     }
-    console.log("uniqueRecords", uniqueRecords)
-    traces.push({
+    const unique = uniqueRecords.filter(item => item.latGeo !== "0" && item.latGeo !== 0)
+    const hover = geoRow.code_insee == '978-977' ? '%{text}' : null
+    
+    let geoTrace = {
       type: 'scattermapbox', // Changement ici
-      lon: franceAll ? uniqueRecords.map(r => Number(r.longGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longGeoDGOM)) : uniqueRecords.map(r => Number(r.longGeo)),
-      lat: franceAll ? uniqueRecords.map(r => Number(r.latGeoDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.latGeoDGOM)) : uniqueRecords.map(r => Number(r.latGeo)),
+      lon: franceAll ? unique.map(r => Number(r.longGeoDGOM2)) : DGOMMap ? unique.map(r => Number(r.longGeoDGOM)) : unique.map(r => Number(r.longGeo)),
+      lat: franceAll ? unique.map(r => Number(r.latGeoDGOM2)) : DGOMMap ? unique.map(r => Number(r.latGeoDGOM)) : unique.map(r => Number(r.latGeo)),
       mode: 'text',
-      text: uniqueRecords.map(r => r.nomGeo),
+      text: unique.map(r => r.nomGeo),
       showlegend: false, 
       textfont: {
         size: 16,
         color: "#08306B"
+        }     
       }
-    });
+      //on ne montre le nom au survol que pour Sint Maarten (drapeau)
+      geoRow.code_insee == '978-977' ? geoTrace.hovertemplate= '%{text}<extra></extra>' : geoTrace.hoverinfo = 'skip'
+      traces.push(geoTrace)
   }
 
   // --- COUCHE TEXTE EPCI (MAPBOX) ---
@@ -1463,16 +1519,16 @@ featuresLignes.forEach((featureLigne, index) => {
       });
     });
 
-  // France entière : affichage du nom des territoires (from refTerritoire)
+  // France entière : affichage du nom des territoires (from refTerritoire) ou pas si showgeo décoché
 
-  if (franceAll) {
+  if (franceAll && showGeo) {
     const territoiresAffiches = territoireRows.filter(r => r.dansFranceAll === true)
-    
+
     territoiresAffiches.forEach(r => {
       traces.push({
         type: 'scattermapbox',
-        lon: [Number(r.longDGOM2)],
-        lat: [Number(r.latDGOM2)],
+        lon: geoRow.estFranceAll == "V" ? [Number(r.longDGOM2v)] : [Number(r.longDGOM2)],
+        lat: geoRow.estFranceAll == "V" ? [Number(r.latDGOM2v)] : [Number(r.latDGOM2)],
         mode: 'text',
         text: [r.libelle],
         showlegend: false, 
@@ -1492,10 +1548,8 @@ function applySavedValue() {
   if (!pendingSelectedValue) return;
 
   select.value = pendingSelectedValue;
-
-  // déclenche le refresh pour être sûr
-  refreshMap();
 }
+
 grist.onRecord(async (record) => {
   // Sécurité : si aucun enregistrement n'est sélectionné
   if (!record) return;
@@ -1554,9 +1608,9 @@ grist.onOptions((options, interaction) => {
 });
 
 
-function buildLegend(records, unknown) {
+async function buildLegend(records, unknown) {
   const legendDiv = document.getElementById("legend");
-  
+
   if (metriqueType !== "Seuils" && metriqueType !== "Categorie") {
     legendDiv.classList.add("hidden");
     if (document.getElementById("floatDiv") !== null ) { // pour éviter la multiplication des éléments
@@ -1592,9 +1646,10 @@ function buildLegend(records, unknown) {
   } else {
     // Si c'est 'Seuils' ou 'Categories', on réaffiche la légende HTML standard
     legendDiv.classList.remove("hidden");
-    
+    document.querySelectorAll('.legend-item').forEach(el => el.remove());
     // Vider et reconstruire votre légende HTML custom ici...
     legendDiv.innerHTML = ""; 
+    
     if (titreLegende) {
       const titleEl = document.createElement("div");
       titleEl.className = "legend-titre";
@@ -1606,10 +1661,10 @@ function buildLegend(records, unknown) {
   
     let liste = document.createElement("div");
     liste.className = "legend-list";
-    legend.appendChild(liste);
+
+    legendDiv.appendChild(liste);
     // CAS 1 : Catégorie
     if (metriqueType == "Categorie") {
-        
       const categories = [...new Set(
         records.map(r => Number(r.Valeur))
       )].sort((a,b) => a - b);
@@ -1637,34 +1692,28 @@ function buildLegend(records, unknown) {
     }
 
     if (metriqueType === "Seuils") {
-      const colors = metriqueCouleurCat.split(",");
-      const classes = [
-        {
-          label: `< ${metriqueSeuil1}`,
-          color: colors[0]
-        },
-        {
-          label: ` ${metriqueSeuil1} < valeur < ${metriqueSeuil2}`,
-          color: colors[1]
-        },
-        {
-          label: `> ${metriqueSeuil2}`,
-          color: colors[2]
-        }
-      ];
-    
-      classes.forEach(c => {
+      const categ = await grist.docApi.fetchTable('Categories');
 
+        // Reconstruit les lignes sous forme de tableau d'objets
+        const nbRows = categ.id.length;
+        const categs = [];
+        for (let i = 0; i < nbRows; i++) {
+          const row = {};
+          for (const col of Object.keys(categ)) {
+            row[col] = categ[col][i];
+          }
+          categs.push(row);
+        }
+      const cats = categs.filter(r => r.metrique === metrique.id);
+      cats.forEach(cat => {
         const item = document.createElement("div");
         item.className = "legend-item";
-
         item.innerHTML = `
           <div class="legend-color"
-              style="background:${c.color}">
+              style="background:${cat.code}">
           </div>
-          <span class="legend-text">${c.label}</span>
+          <span class="legend-text">${cat.nom}</span>
         `;
-
         liste.appendChild(item);
       });
     }
@@ -1690,7 +1739,7 @@ function buildLegend(records, unknown) {
           </div>
           <span class="legend-text">${textPointsUnit}</span>
         `
-      legend.appendChild(item);
+      legendDiv.appendChild(item);
     }
     if (showPointsEPCI) {
       const item = document.createElement("div");
@@ -1701,7 +1750,7 @@ function buildLegend(records, unknown) {
           </div>
           <span class="legend-text">${textPointsUnitEPCI}</span>
         `
-      legend.appendChild(item);
+      legendDiv.appendChild(item);
     }
   } 
   
@@ -1714,7 +1763,7 @@ function buildColorscale(nbCat) {
   //console.log('metriqueType',metriqueType)
   //console.log('list',liste)
   if (metriqueType === "Seuils") { 
-    const n=3
+    const n=nbCat
     for (let i = 0; i < n; i++) {
       const start = i / n;
       const end = (i + 1) / n;
@@ -1756,7 +1805,6 @@ async function saveMetricOptions() {
   try {
 
     const table = grist.getTable("Metriques");
-
     await table.update({
       id: metrique.id,
       fields: {
