@@ -1013,9 +1013,14 @@ async function init() {
       refreshMap(true);
     });
     showPointsValue.addEventListener("change", (e) => { 
-      showPoints = e.target.checked ;
-      document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);   // true → ajoute la classe, false → la retire
-      refreshMap(true);
+      if (metrique.IndId2 == 0) {
+        alert("Il faut définir un indicateur dans la métrique avant de l'afficher (colonne IndicateurPtCommunes)")
+        e.target.checked = false
+      } else {
+        showPoints = e.target.checked ;
+        document.getElementById("showCommunePointDetails").classList.toggle('hidden', !showPoints);   // true → ajoute la classe, false → la retire
+        refreshMap(true);
+      }
     });
     showPointsValueMairies.addEventListener("change", (e) => { 
       showPointsMairies = e.target.checked ;
@@ -1023,9 +1028,14 @@ async function init() {
       refreshMap(true);
     });
     showPointsValueEPCI.addEventListener("change", (e) => { 
-      showPointsEPCI = e.target.checked ;
-      document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
-      refreshMap(true);
+      if (metrique.IndId3 == 0) {
+        alert("Il faut définir un indicateur dans la métrique avant de l'afficher (colonne IndicateurPtEPCI)")
+        e.target.checked = false
+      } else {
+        showPointsEPCI = e.target.checked ;
+        document.getElementById("showEPCIPointDetails").classList.toggle('hidden', !showPointsEPCI);   // true → ajoute la classe, false → la retire
+        refreshMap(true);
+      }
     });
     showGeoSwitch.addEventListener("change", (e) => { 
       showGeo = e.target.checked ;
@@ -1169,12 +1179,12 @@ async function refreshMap(sidePanel) {
     records3 = recordsTerr.filter(r => (Number(r.Indicateur) === Number(metrique.IndId3)) && (r.porteeValeur === 'EPCI'))
   } 
 
-  /*console.log("records1 : " + metrique.IndId1)
+  console.log("records1 : " + metrique.IndId1)
   console.log("records1", records1)
   console.log("records2 : " + metrique.IndId2)
   console.log("records2", records2)
   console.log("records3 : " + metrique.IndId3)
-  console.log("records3", records3)*/
+  console.log("records3", records3)
  
   const colorscale = metriqueCouleurCat ? buildColorscale(metriqueCouleurCat.split(',').length) : metriqueType; 
 
@@ -1319,8 +1329,8 @@ async function refreshMap(sidePanel) {
   
 
   // --- COUCHE POINTS COMMUNES (MAPBOX) ---
-  if (showPoints && records2) {
-    const uniqueRecords = [
+  if (showPoints && records2 && geoRow.estFranceAll != "V" ) {
+    const uniqueRecords =[
       ...new Map(records2.map(r => [`${r.lat}|${r.long}`, r])).values()
     ];
     let maxValue;
@@ -1347,7 +1357,7 @@ async function refreshMap(sidePanel) {
   }
 
   // --- COUCHE POINTS Mairie  ---
-  if (showPointsMairies) {    
+  if (showPointsMairies && !franceAll) {    
     const uniqueRecords = [
       ...new Map(recordsTerr.map(r => [`${r.lat}|${r.long}`, r])).values()
     ];
@@ -1368,7 +1378,7 @@ async function refreshMap(sidePanel) {
   }
 
   // --- COUCHE POINTS EPCI (MAPBOX) ---
-  if (showPointsEPCI && records3) {
+  if (showPointsEPCI && records3 && geoRow.estFranceAll != "V" ) {
     let maxValueEPCI;
     let markerSizesEPCI;
     const uniqueRecords = [
@@ -1396,7 +1406,7 @@ async function refreshMap(sidePanel) {
   }
 
   // --- COUCHE TEXTE COMMUNES (MAPBOX) ---
-  if (showText) {    
+  if (showText && geoRow.estFranceAll != "V") {    
     const uniqueRecords = [
       ...new Map(recordsTerr.map(r => [`${r.lat}|${r.long}`, r])).values()
     ];
@@ -1415,6 +1425,32 @@ async function refreshMap(sidePanel) {
     });
   }
 
+ 
+
+  // --- COUCHE TEXTE EPCI (MAPBOX) ---
+  if (showTextEPCI && geoRow.estFranceAll != "V") {
+    const seen = new Set();
+    const uniqueRecords = recordsTerr.filter(r => {
+      if (seen.has(r.NomEPCI)) return false; // Correction : NomEPCI pour filtrer les doublons d'EPCI, pas Nom de commune
+      seen.add(r.NomEPCI);
+      return true;
+    });
+    traces.push({
+      type: 'scattermapbox', // Changement ici
+      lon:  franceAll ? uniqueRecords.map(r => Number(r.longEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
+      lat: franceAll ? uniqueRecords.map(r => Number(r.latEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
+      mode: 'text',
+      text: uniqueRecords.map(r => r.NomEPCI),
+      showlegend: false, 
+      textfont: {
+        size: textSizeEPCI,
+        color: textColorEPCI
+      },
+      hoverinfo: 'skip',
+    });
+  }
+
+   // --- COUCHE Géographie (nom des îles) ---
   if (showGeo && !franceAll) {
     let uniqueRecords = [] 
     if (DGOMMap) {
@@ -1446,28 +1482,7 @@ async function refreshMap(sidePanel) {
       traces.push(geoTrace)
   }
 
-  // --- COUCHE TEXTE EPCI (MAPBOX) ---
-  if (showTextEPCI) {
-    const seen = new Set();
-    const uniqueRecords = recordsTerr.filter(r => {
-      if (seen.has(r.NomEPCI)) return false; // Correction : NomEPCI pour filtrer les doublons d'EPCI, pas Nom de commune
-      seen.add(r.NomEPCI);
-      return true;
-    });
-    traces.push({
-      type: 'scattermapbox', // Changement ici
-      lon:  franceAll ? uniqueRecords.map(r => Number(r.longEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.longEPCIDGOM)) : uniqueRecords.map(r => Number(r.longEPCI)),
-      lat: franceAll ? uniqueRecords.map(r => Number(r.latEPCIDGOM2)) : DGOMMap ? uniqueRecords.map(r => Number(r.latEPCIDGOM)) : uniqueRecords.map(r => Number(r.latEPCI)),
-      mode: 'text',
-      text: uniqueRecords.map(r => r.NomEPCI),
-      showlegend: false, 
-      textfont: {
-        size: textSizeEPCI,
-        color: textColorEPCI
-      },
-      hoverinfo: 'skip',
-    });
-  }
+
   // --- COUCHE LIGNE DE SÉPARATION DEPUIS LE GEOJSON ---
 // On cherche l'entité "ligne" dans les features du GeoJSON
 
@@ -1519,8 +1534,7 @@ featuresLignes.forEach((featureLigne, index) => {
       });
     });
 
-  // France entière : affichage du nom des territoires (from refTerritoire) ou pas si showgeo décoché
-
+  // NOM DES TERRITOIRES (France entière) ou pas si showgeo décoché
   if (franceAll && showGeo) {
     const territoiresAffiches = territoireRows.filter(r => r.dansFranceAll === true)
 
