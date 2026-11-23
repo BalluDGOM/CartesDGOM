@@ -813,7 +813,7 @@ document.getElementById("cameraBtn").addEventListener("click", async () => {
   }
 });
 
-async function loadGeoJson(geoJsonCell) {
+/*async function loadGeoJson(geoJsonCell) {
   const attachments =
   await grist.docApi.fetchTable("_grist_Attachments");
   try {
@@ -828,6 +828,11 @@ async function loadGeoJson(geoJsonCell) {
       } catch (error) {
         console.error("Error downloading or encoding image:", error);
       }
+}*/
+async function loadGeoJson(nomFichier){
+  const r = await fetch(`./geo/${nomFichier}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 }
 
 async function initMetrique() {
@@ -1160,7 +1165,8 @@ async function refreshMap(sidePanel) {
     geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
   }
 
-  const geojson = await loadGeoJson(geoJsonCell);
+// const geojson = await loadGeoJson(geoJsonCell);
+  const geojson = await loadGeoJson(record.FichierGeo);
   delete geojson.crs
   let cleanedGeojson = geojson;
   if (validateGeoJSON(geojson).length > 0) {
@@ -2015,3 +2021,4 @@ document
 
 </body>
 </html>
+
