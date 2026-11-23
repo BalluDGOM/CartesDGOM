@@ -954,6 +954,8 @@ async function init() {
     ref.id.map((_, i) => ({
       territoire: ref.Nom[i],
       territoireId: ref.id[i],
+      FichierGeoDGOM: ref.FichierGeoDGOM[i],
+      FichierGeo: ref.FichierGeo[i],
       geoJson: ref.GeoJson[i],
       geoJsonDGOM: ref.GeoJsonDGOM[i],
       estFranceAll: ref.estFranceAll[i],
@@ -2021,5 +2023,6 @@ document
 
 </body>
 </html>
+
 
 
