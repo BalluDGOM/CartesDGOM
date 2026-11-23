@@ -830,7 +830,7 @@ document.getElementById("cameraBtn").addEventListener("click", async () => {
       }
 }*/
 async function loadGeoJson(nomFichier){
-  const r = await fetch(`./geo/${nomFichier}`);
+  const r = await fetch(`https://balludgom.github.io/CartesDGOM/geo/${nomFichier}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
@@ -2023,6 +2023,7 @@ document
 
 </body>
 </html>
+
 
 
 
