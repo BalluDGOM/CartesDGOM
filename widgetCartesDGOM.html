@@ -1154,19 +1154,19 @@ async function refreshMap(sidePanel) {
   const longCentreCarte = DGOMMap ? (geoRow.longCentreCarteDGOM ? geoRow.longCentreCarteDGOM : geoRow.longCentreCarte) : geoRow.longCentreCarte;  
   const zoomCarte = DGOMMap ? (geoRow.zoomCarteDGOM ? geoRow.zoomCarteDGOM : geoRow.zoomCarte) : geoRow.zoomCarte ;   
 
-  const geoJsonDGOMSafe = geoRow.geoJsonDGOM ? geoRow.geoJsonDGOM : geoRow.geoJson
+  const geoJsonDGOMSafe = geoRow.FichierGeoDGOM ? geoRow.FichierGeoDGOM : geoRow.FichierGeo
   let geoJsonCell
   if (franceAll) { //France entière => carte DGOM
-    geoJsonCell = geoRow.geoJson
+    geoJsonCell = geoRow.FichierGeo
     DGOMMapSwitch.checked = true;
     DGOMMap = true ;
     syncShowMap();
   } else {
-    geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.geoJson ; 
+    geoJsonCell = DGOMMap ? geoJsonDGOMSafe : geoRow.FichierGeo ; 
   }
 
 // const geojson = await loadGeoJson(geoJsonCell);
-  const geojson = await loadGeoJson(record.FichierGeo);
+  const geojson = await loadGeoJson(geoJsonCell);
   delete geojson.crs
   let cleanedGeojson = geojson;
   if (validateGeoJSON(geojson).length > 0) {
@@ -2021,4 +2021,5 @@ document
 
 </body>
 </html>
+
 
